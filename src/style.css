@@ -1666,6 +1666,31 @@ input[type=range]::-moz-range-thumb {
   height:13px
 }
 
+.observation-actions {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end
+}
+
+.dictate-button.is-listening {
+  background:#fbe9e4;
+  border-color:#eec3b8;
+  color:#b4523c
+}
+
+.dictate-button.is-listening .icon {
+  animation:live-pulse 1.2s ease-in-out infinite
+}
+
+.dictation-note {
+  margin-top:11px;
+  font-size:8px;
+  line-height:1.7;
+  color:#a0ad8e
+}
+
 .next-experiments {
   display:flex;
   align-items:center;

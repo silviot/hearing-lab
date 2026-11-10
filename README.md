@@ -57,7 +57,7 @@ This is an educational playground, not a calibrated hearing assessment. The soun
 
 ## Privacy and offline use
 
-Sound is synthesized on your device. There is no account, analytics service, microphone request, advertising, remote sound library, or application backend. Up to 300 recent notebook entries stay in that browser's local storage unless you export them. Listening preferences are stored locally too. Clearing site data removes local entries; an exported file is your own copy.
+Sound is synthesized on your device. There is no account, analytics service, advertising, remote sound library, or application backend. Up to 300 recent notebook entries stay in that browser's local storage unless you export them. Listening preferences are stored locally too. Dictating a note is optional: it uses the browser's speech recognition, which asks for the microphone and, in most browsers, sends the audio to the browser vendor's speech service. Clearing site data removes local entries; an exported file is your own copy.
 
 After downloading the project, the app runs with no internet connection using the local server above. A hosted visit still downloads the page and its assets from that host, which may keep normal access logs. Following a source or reference link opens the linked site. Browser cache alone is not a guarantee that a hosted copy will reload offline.
 

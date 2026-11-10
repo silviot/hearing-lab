@@ -23,6 +23,7 @@ const paths = {
   close: '<path d="m6 6 12 12M18 6 6 18"/>',
   reset: '<path d="M4 10a8 8 0 1 1 0 5m0-11v6h6"/>',
   volume: '<path d="m11 4-6 5H2v6h3l6 5V4Zm4 4a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3m-4 0h8"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
 };
 export const icon = (name, cls = '') => `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.wave}</svg>`;

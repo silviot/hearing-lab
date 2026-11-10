@@ -15,6 +15,7 @@ Hearing Lab is a static application built from native browser ES modules. Node.j
 | `src/ui/pictures.js` | One explanatory picture per experiment, drawn from the current settings. |
 | `src/lib/challenges.js` | Pure challenge state, randomization, adaptive updates, observations, and result summaries. |
 | `src/ui/challenges.js` | Present intervals and response controls; connect challenge state to the audio engine and notebook. |
+| `src/ui/dictation.js` | Merge words from the browser's speech recognition into the observation note. |
 | `src/lib/notebook.js` | Store the user's notebook locally; support a downloadable JSON export. |
 | `scripts/` | Local static server, asset-copy build, and project checks. |
 | `tests/` | Node-native tests for numerical and state-machine properties. |

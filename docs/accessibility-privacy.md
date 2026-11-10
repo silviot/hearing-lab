@@ -33,12 +33,13 @@ On a shared browser, local notebook entries remain visible to the next person us
 | Generating and playing a sound | The browser and the device's audio output. |
 | Answering a challenge | In-memory app state, and local notebook storage when saved. |
 | Writing a note | Browser-local storage, retaining up to 300 recent entries. |
+| Dictating a note | The microphone, through the browser's own speech recognition. In most browsers the audio goes to the browser vendor's speech service; the app only receives the text. |
 | Exporting JSON | A file download requested by the user. |
 | Sharing an experiment link | Parameter settings in the URL fragment, copied to the clipboard on request; notebook text is excluded. |
 | Loading a hosted app | The static host receives ordinary page/asset requests. |
 | Opening a reference/source link | The browser navigates to that external site. |
 
-There is no microphone capture, audio recording, application telemetry, remote scoring service, advertising, or cloud notebook. A hosting provider can still keep access logs; self-hosting controls that part of the data flow.
+The microphone is used only while the user dictates a note, after the browser's own permission prompt, and only through the browser's speech recognition; the app never reads or stores the audio. Browsers without that feature do not show the Dictate button. There is no audio recording, application telemetry, remote scoring service, advertising, or cloud notebook. A hosting provider can still keep access logs; self-hosting controls that part of the data flow.
 
 ## Persistence limits
 
