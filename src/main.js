@@ -5,10 +5,11 @@ import { experiments, byId, categories } from './lib/catalog.js';
 import { readNotes, saveNote, removeNote, downloadNotes, readPreferences, savePreferences, escapeHtml as esc } from './lib/notebook.js';
 import { icon, heroScope, cardVisual, signalScope, spectrumView } from './ui/visuals.js';
 import { mountChallenge } from './ui/challenges.js';
+import { picture } from './ui/pictures.js';
 
 const app = document.querySelector('#app');
 let prefs = readPreferences();
-let active = 'explore', category = 'All experiments', query = '', cleanupChallenge = null, animation = null, previewFrame = null, playingAt = 0, playingDuration = 0, currentMode = 'explore';
+let active = 'explore', category = 'All experiments', query = '', cleanupChallenge = null, animation = null, previewFrame = null, shownPitchClass = 0, currentMode = 'explore';
 const settings = Object.fromEntries(experiments.map(e => [e.id, structuredClone(e.defaults)]));
 const visited = new Set(Array.isArray(prefs.explored) ? prefs.explored : []);
 const engine = new AudioEngine({ onState: audioState });
@@ -58,7 +59,7 @@ function syncNavigation() {
 const main = () => document.querySelector('#main-content');
 
 function renderHome() {
-  main().innerHTML = `<section class="home-intro"><div><div class="eyebrow"><span></span> FOLLOW YOUR EARS</div><h1>Sound is stranger<br>than you think<span class="heading-dot">.</span></h1><p>A hands-on playground for sound and perception.<br class="desktop-break"> Make a prediction. Press play. Surprise yourself.</p></div><div class="intro-index"><span>11</span><div>EXPERIMENTS<br>ENDLESS QUESTIONS</div></div></section>
+  main().innerHTML = `<section class="home-intro"><div><div class="eyebrow"><span></span> FOLLOW YOUR EARS</div><h1>Sound is stranger<br>than you think<span class="heading-dot">.</span></h1><p>A hands-on playground for sound and perception.<br class="desktop-break"> Make a prediction. Press play. Turn the knobs while it sounds.</p></div><div class="intro-index"><span>11</span><div>EXPERIMENTS<br>ENDLESS QUESTIONS</div></div></section>
   <a href="#phase" class="feature-card"><div class="feature-copy"><span class="feature-label">START WITH A LITTLE PARADOX <span>01 / 11</span></span><h2>Can two sounds<br>make silence?</h2><p>One wave. Its opposite. Two ears.<br>Meet the surprisingly strange world of phase.</p><span class="feature-button">Explore phase & polarity ${icon('arrow')}</span><div class="feature-foot">${icon('headphones')} Headphones recommended <span>·</span> 2 minutes</div></div><div class="feature-visual"><div class="scope-labels"><span><i class="left-dot"></i> LEFT</span><span><i class="right-dot"></i> RIGHT</span><span><i class="sum-dot"></i> MONO MIX</span></div>${heroScope()}<div class="scope-equation"><span>+1</span><span>−1</span><span>= 0</span></div><div class="scope-caption">OPPOSITE WAVES · 180° APART</div></div></a>
   <section class="catalog-section" aria-labelledby="catalog-title"><div class="section-heading"><h2 id="catalog-title">Pick a rabbit hole<span class="count-pill">11</span></h2><span>Small experiments. Big “wait, what?”</span></div><div class="catalog-tools"><div class="category-tabs" role="group" aria-label="Filter experiments">${categories.map(c => `<button class="category-tab ${category === c ? 'selected' : ''}" data-category="${c}" aria-pressed="${category === c}">${c}</button>`).join('')}</div><input type="search" id="experiment-search" placeholder="Find an experiment…" aria-label="Search experiments" value="${esc(query)}"></div><div id="experiment-grid" class="experiment-grid"></div></section>
   <section class="home-note"><div class="home-note-icon">${icon('headphones')}</div><div><h3>A little setup goes a long way.</h3><p>Grab headphones, find a quiet spot, and start at a comfortable low volume. No microphone or account needed.</p></div><button class="text-button" data-action="setup">Check my setup ${icon('arrow')}</button></section>`;
@@ -73,7 +74,7 @@ function renderExperimentPage() {
   const e = byId[active];
   main().innerHTML = `<section class="experiment-header"><a class="back-link" href="#explore">← All experiments</a><div class="experiment-heading-row"><div><div class="eyebrow"><span class="number-label">${e.number}</span> ${e.category.toUpperCase()} <span class="eyebrow-separator">/</span> ${e.time}</div><h1>${e.title}<span class="heading-dot">.</span></h1><p>${e.description}</p></div><span class="large-experiment-icon ${e.color}">${icon(e.icon)}</span></div></section>
   <div class="experiment-layout"><div class="experiment-workbench"><div class="workbench-top"><span class="panel-label">${icon('waves')} THE WORKBENCH</span><div class="workbench-tools">${e.challenge ? `<div class="mode-tabs"><button data-mode="explore" class="${currentMode === 'explore' ? 'selected' : ''}">Explore</button><button data-mode="challenge" class="${currentMode === 'challenge' ? 'selected' : ''}">Challenge</button></div>` : ''}<button class="icon-button" data-action="reset" title="Reset experiment" aria-label="Reset experiment">${icon('reset')}</button><button class="icon-button" data-action="share" title="Copy experiment link" aria-label="Copy experiment link">${icon('share')}</button></div></div><div id="workbench-body"></div></div>
-  <aside class="experiment-guide"><div class="prediction"><span class="tiny-label">BEFORE YOU PRESS PLAY</span><h2>${e.question}</h2><p>Make a guess. Then let your ears decide.</p></div><section class="try-this"><span class="tiny-label">TRY THIS</span><ol>${e.steps.map(s => `<li>${s}</li>`).join('')}</ol></section><div class="discovery-fact">${icon('info')}<p>${e.fact}</p></div></aside></div>
+  <aside class="experiment-guide"><div class="prediction"><span class="tiny-label">BEFORE YOU PRESS PLAY</span><h2>${e.question}</h2><p>Make a guess. Then press Play and let your ears decide.</p></div><section class="try-this"><span class="tiny-label">TRY THIS</span><ol>${e.steps.map(s => `<li>${s}</li>`).join('')}</ol></section><div class="discovery-fact">${icon('info')}<p>${e.fact}</p></div></aside></div>
   <section class="understanding"><div class="explanation"><div class="eyebrow">THE PART BEHIND THE MAGIC</div><h2>What’s happening?</h2><p>${e.explanation}</p><details><summary>A little deeper ${icon('arrow')}</summary><p>${e.detail}</p><a href="${e.source}" target="_blank" rel="noopener noreferrer">${e.sourceLabel} ↗</a></details></div><div class="observation-card"><div class="observation-heading">${icon('book')}<h3>What did you notice?</h3></div><label class="sr-only" for="observation">Your observation</label><textarea id="observation" rows="3" maxlength="1500" placeholder="A prediction, a surprise, a question…"></textarea><div class="observation-footer"><span>Saved on this device.</span><button class="small-button" data-action="save-note">Save a note ${icon('arrow')}</button></div></div></section>
   <nav class="next-experiments" aria-label="More experiments"><span>KEEP FOLLOWING YOUR EARS</span>${[experiments[(experiments.indexOf(e) + 1) % experiments.length], experiments[(experiments.indexOf(e) + 2) % experiments.length]].map(n => `<a href="#${n.id}">${icon(n.icon)} ${n.title} ${icon('arrow')}</a>`).join('')}</nav>`;
   renderWorkbench();
@@ -89,7 +90,10 @@ function renderWorkbench() {
     } });
     return;
   }
-  body.innerHTML = `<div class="playback-row"><button class="primary-button listen-button" id="listen-button" data-action="listen">${icon('play')}<span>Listen</span></button><div><strong id="listen-description">A short sound, then silence.</strong><span>Change a setting, then listen again.</span></div><span id="clip-duration" class="clip-duration"></span></div><div class="scope-panel"><div class="scope-top"><div class="scope-legend"><span><i class="left-dot"></i>Left</span><span><i class="right-dot"></i>Right</span><span><i class="sum-dot"></i>Mono average</span></div><span class="scope-live-label">GENERATED SIGNAL</span></div><div id="signal-visual"></div><div class="scope-bottom"><span id="scope-context"></span><span>Fixed visual scale · digital signal</span></div></div><div class="experiment-controls" id="experiment-controls"></div>`;
+  body.innerHTML = `<div class="playback-row"><button class="primary-button listen-button" id="listen-button" data-action="listen" aria-pressed="false">${icon('play')}<span>Play</span></button><div><strong id="listen-description"></strong><span>It plays until you press Stop. Change anything while you listen.</span></div><span id="live-badge" class="live-badge" hidden><i></i>LIVE</span></div>
+  <figure class="picture-panel" id="picture-panel"><div class="picture-top"><span class="picture-label">THE IDEA IN A PICTURE</span><strong id="picture-title"></strong></div><div class="picture-scroll"><div id="picture"></div></div><span class="picture-swipe" aria-hidden="true">Swipe the picture sideways →</span><figcaption id="picture-caption"></figcaption></figure>
+  <div class="experiment-controls" id="experiment-controls"></div>
+  <div class="scope-panel"><div class="scope-top"><div class="scope-legend"><span><i class="left-dot"></i>Left</span><span><i class="right-dot"></i>Right</span><span><i class="sum-dot"></i>Mono average</span></div><span class="scope-live-label">THE SIGNAL ITSELF</span></div><div id="signal-visual"></div><div class="scope-bottom"><span id="scope-context"></span><span>Fixed visual scale · digital signal</span></div></div>`;
   renderControls(); updateVisual();
 }
 
@@ -119,7 +123,6 @@ function renderControls() {
     if (p.mode === 'phase') html += range('phase','Relative phase',0,360,1,false,'One complete cycle');
     else if (p.mode === 'polarity') html += segments('phase','Right-channel polarity',[[0,'Matching'],[180,'Upside down']]);
     else html += range('delayMs','Right-channel delay',0,2,.05);
-    html += `<div class="inline-insight" id="phase-insight"></div>`;
   } else if (active === 'beats') {
     html = range('frequency','First tone',100,800,1,true) + range('difference','Frequency spacing',.5,20,.5,false,'This sets the beat rate') + segments('routing','Listen to the tones',[['together','Mixed together'],['separate','One in each ear']]);
   } else if (active === 'harmonics') {
@@ -130,47 +133,69 @@ function renderControls() {
   } else if (active === 'spatial') {
     html = segments('source','Sound source',[['noise','Broadband noise'],['sine','Pure tone']]) + range('pan','Left / right balance',-1,1,.01) + range('delayMs','Waveform delay',-1,1,.025,false,'Positive = right waveform lags');
     if(p.source === 'sine') html += range('frequency','Tone frequency',125,1500,1,true);
-    html += `<div class="ear-diagram"><span>${icon('headphones')} LEFT</span><div class="spatial-track"><i style="left:${50+Number(p.pan)*45}%"></i></div><span>RIGHT</span></div>`;
   } else if (active === 'masking') {
-    html = segments('invertTone','The tone in your ears',[[false,'Matching tones'],[true,'Opposite tone']]) + range('snr','Tone relative to noise',-30,0,1,false,'Lower = harder to find') + segments('routing','Output',[['stereo','Separate ears'],['mono','Mix to mono']]) + `<p class="control-hint">Listen for four pulses. The same noise stays in both channels; only the tone flips.</p>`;
+    html = segments('invertTone','The tone in your ears',[[false,'Matching tones'],[true,'Opposite tone']]) + range('snr','Tone relative to noise',-30,0,1,false,'Lower = harder to find') + segments('routing','Output',[['stereo','Separate ears'],['mono','Mix to mono']]) + `<p class="control-hint">The tone pulses on and off, twice a second. The same noise stays in both ears; only the tone flips.</p>`;
   } else if (active === 'noise') {
-    html = segments('color','Choose a spectrum',[['white','White'],['pink','Pink'],['brown','Brown']]) + `<div class="noise-explainer"><span class="noise-color-swatch ${p.color}"></span><div><h3>${p.color === 'white' ? 'Equal power per hertz' : p.color === 'pink' ? 'Roughly equal power per octave' : 'More weight toward low frequencies'}</h3><p>${p.color === 'white' ? 'Bright and hissy. Lots of high-frequency energy.' : p.color === 'pink' ? 'A gentler balance between low and high frequencies.' : 'A darker rumble with rapidly falling high-frequency energy.'}</p></div></div>`;
+    html = segments('color','Choose a spectrum',[['white','White'],['pink','Pink'],['brown','Brown']]) + `<p class="control-hint">Switch colors while the noise plays. The change is easiest to hear at the moment you switch.</p>`;
   } else if (active === 'shepard') {
-    html = segments('direction','Choose a direction',[['up','Always ascending'],['down','Always descending']]) + `<div class="shepard-steps" aria-label="Twelve semitone steps, each with octave-spaced layers">${Array.from({length:12},(_,i) => `<div style="--step:${p.direction === 'up' ? i : 11-i}"><i></i><i></i><i></i><span>${i+1}</span></div>`).join('')}</div><p class="control-hint">12 steps. Several octave layers. Listen twice to hear the loop.</p>`;
+    html = segments('direction','Choose a direction',[['up','Always ascending'],['down','Always descending']]) + `<p class="control-hint">Let it run. After 12 steps it is back where it began, yet it never seems to drop. Flip the direction mid-climb.</p>`;
   } else if (active === 'frequency') {
-    html = range('frequency','Tone frequency',80,Math.min(18000, .45 * (engine.sampleRate || 48000)),1,true) + `<div class="frequency-presets">${[125,250,500,1000,2000,4000,8000,12000,16000].map(f => `<button data-frequency="${f}" class="${Math.abs(p.frequency-f)<1?'selected':''}">${f < 1000 ? f : `${f/1000}k`}</button>`).join('')}</div>` + segments('ear','Listen with',[['both','Both ears'],['left','Left only'],['right','Right only']]) + `<p class="control-hint">Keep one comfortable volume. If a tone disappears, let it disappear. This is a map of your current setup.</p>`;
-  } else if (active === 'pitch') html = range('frequency','Try a pitch',100,4000,1,true) + `<p class="control-hint">Explore first, then switch to the challenge to compare two pitches.</p>`;
-  else if (active === 'gap') html = range('gapMs','Silent plateau',1,64,1,false,'Short smooth edges surround the gap') + `<p class="control-hint">Hear a gap in noise, then try finding it among three intervals in the challenge.</p>`;
-  document.querySelector('#experiment-controls').innerHTML = html;
-  updatePhaseInsight();
+    html = range('frequency','Tone frequency',80,Math.min(18000, .45 * (engine.sampleRate || 48000)),1,true) + `<div class="frequency-presets">${[125,250,500,1000,2000,4000,8000,12000,16000].map(f => `<button data-frequency="${f}" class="${Math.abs(p.frequency-f)<1?'selected':''}">${f < 1000 ? f : `${f/1000}k`}</button>`).join('')}</div>` + segments('ear','Listen with',[['both','Both ears'],['left','Left only'],['right','Right only']]) + `<p class="control-hint">Sweep the slider while the tone plays. Keep one comfortable volume: if a tone disappears, let it disappear. Do not turn it up to chase it.</p>`;
+  } else if (active === 'pitch') html = range('frequency','Try a pitch',100,4000,1,true) + `<p class="control-hint">Slide slowly while the tone plays, then switch to the challenge to compare two pitches.</p>`;
+  else if (active === 'gap') html = range('gapMs','Silent plateau',1,64,1,false,'Short smooth edges surround the gap') + `<p class="control-hint">The noise is interrupted every two thirds of a second. Shrink the gap until the stutter melts away, then try the challenge.</p>`;
+  // Rebuilding the controls must not throw away keyboard focus.
+  const focused = document.activeElement?.closest?.('#experiment-controls') ? document.activeElement : null;
+  const focusKey = focused && (focused.id ? `#${focused.id}` : focused.dataset.paramButton ? `[data-param-button="${focused.dataset.paramButton}"][data-value="${focused.dataset.value}"]` : focused.dataset.preset ? `[data-preset="${focused.dataset.preset}"]` : focused.dataset.frequency ? `[data-frequency="${focused.dataset.frequency}"]` : focused.dataset.harmonic !== undefined ? `[data-harmonic="${focused.dataset.harmonic}"]` : null);
+  const controls = document.querySelector('#experiment-controls');
+  controls.innerHTML = html;
+  if (focusKey) controls.querySelector(focusKey)?.focus({ preventScroll: true });
 }
-function updatePhaseInsight() {
-  const el = document.querySelector('#phase-insight'); if(!el) return;
-  const p = settings.phase;
-  if(p.routing === 'mono' && p.mode !== 'delay' && Number(p.phase) === 180) el.innerHTML = `${icon('check')}<span>The software mono mix cancels. Silence is the result.</span>`;
-  else if(p.mode === 'delay') el.innerHTML = `${icon('info')}<span>${p.delayMs} ms is ${(Number(p.delayMs)*Number(p.frequency)*.36).toFixed(0)}° at ${p.frequency} Hz. Other frequencies shift by different angles.</span>`;
-  else el.innerHTML = `${icon('info')}<span>${p.routing === 'stereo' ? 'Separate channels stay audible. They have not been added together.' : 'Both ears receive the average of the two generated waves.'}</span>`;
+const LISTEN_TEXT = {
+  phase: p => p.routing === 'mono' ? 'Two waves, added before they reach you.' : 'One wave for each ear.',
+  beats: p => `${p.frequency} Hz and ${Number(p.frequency) + Number(p.difference)} Hz, ${p.routing === 'separate' ? 'one in each ear' : 'mixed together'}.`,
+  harmonics: () => 'Up to six pure tones, stacked.',
+  amplitude: p => `A steady ${p.shape} wave.`,
+  spatial: p => p.source === 'sine' ? 'A steady tone in both ears.' : 'Steady noise in both ears.',
+  masking: () => 'A pulsing tone, hidden in steady noise.',
+  noise: p => `Steady ${p.color} noise.`,
+  shepard: p => `A staircase that keeps ${p.direction === 'down' ? 'descending' : 'climbing'}.`,
+  frequency: () => 'A steady pure tone.', pitch: () => 'A steady pure tone.',
+  gap: () => 'Noise with a repeating gap.',
+};
+function updatePicture() {
+  const host = document.querySelector('#picture'); if (!host || !byId[active]) return;
+  const live = engine.live ? engine.liveInfo : null;
+  shownPitchClass = live?.pitchClass ?? 0;
+  const drawn = picture(active, settings[active], live);
+  host.innerHTML = drawn.svg;
+  document.querySelector('#picture-title').textContent = drawn.title;
+  document.querySelector('#picture-caption').textContent = drawn.caption;
 }
 function updateVisual() {
-  if (!byId[active] || currentMode !== 'explore') return;
+  if (!byId[active] || currentMode !== 'explore' || !document.querySelector('#signal-visual')) return;
   try {
     const beforeRouting = ['phase','masking'].includes(active);
-    const visualParams = beforeRouting ? {...settings[active],routing:'stereo'} : settings[active];
+    const fullClip = ['beats','gap','shepard','masking'].includes(active);
+    // The scope needs the whole clip only where it draws an envelope; elsewhere half a second is plenty.
+    const visualParams = {...settings[active], ...(beforeRouting ? {routing:'stereo'} : {}), ...(fullClip ? {} : {duration:.5})};
     const rendered = renderExperiment(active,visualParams,engine.sampleRate || 48000,12345);
     document.querySelector('#signal-visual').innerHTML = signalScope(rendered,active,settings[active]) + (['noise','harmonics','amplitude'].includes(active) ? spectrumView(rendered) : '');
-    document.querySelector('#clip-duration').textContent = `${rendered.duration.toFixed(1)} sec`;
-    const p = settings[active];
-    document.querySelector('#scope-context').textContent = beforeRouting ? 'Before output routing · L, R, (L + R) ÷ 2' : ['beats','gap','shepard'].includes(active) ? 'Full-clip peak envelopes' : 'Waveform excerpt · time →';
-    document.querySelector('#listen-description').textContent = active === 'beats' ? `${p.frequency} Hz + ${Number(p.frequency)+Number(p.difference)} Hz` : active === 'phase' ? p.routing === 'mono' ? 'Two signals, added in software.' : 'One signal for each ear.' : 'A short sound, then silence.';
-    updatePhaseInsight();
+    document.querySelector('#scope-context').textContent = beforeRouting ? 'Before output routing · L, R, (L + R) ÷ 2' : active === 'beats' ? `${rendered.duration.toFixed(0)} seconds · peak envelopes` : fullClip ? `One ${rendered.duration.toFixed(1)}-second loop · peak envelopes` : 'Waveform excerpt · time →';
+    document.querySelector('#listen-description').textContent = LISTEN_TEXT[active](settings[active]);
+    updatePicture();
   } catch(error) { console.error(error); toast('That combination could not be rendered. Reset this experiment.'); }
 }
+/** Push the current settings to the sound that is already playing, and redraw. */
+function settingsChanged() {
+  engine.updateLive(active, settings[active]);
+  cancelAnimationFrame(previewFrame); previewFrame = requestAnimationFrame(updateVisual);
+}
 function changeParameter(key, value, rebuild = false) {
-  engine.stop('settings changed'); settings[active][key] = value;
+  settings[active][key] = value;
   if (active === 'phase' && key === 'source' && value !== 'sine' && settings.phase.mode === 'phase') { settings.phase.mode = 'polarity'; settings.phase.phase = settings.phase.phase >= 90 && settings.phase.phase < 270 ? 180 : 0; }
   if (active === 'phase' && key === 'mode' && value === 'polarity' && ![0,180].includes(Number(settings.phase.phase))) settings.phase.phase = 180;
   if(rebuild) renderControls();
-  cancelAnimationFrame(previewFrame); previewFrame = requestAnimationFrame(updateVisual);
+  settingsChanged();
 }
 
 function setupSnapshot() { return { labVolume: engine.volume, sampleRate: engine.sampleRate || null, headphonesConfirmed: !!prefs.setup, calibrated: false }; }
@@ -179,7 +204,7 @@ function renderNotebook() {
   main().innerHTML = `<section class="simple-header"><div class="eyebrow">YOUR OWN LITTLE FIELD GUIDE</div><div class="title-and-action"><h1>Notebook<span class="heading-dot">.</span></h1><button class="outline-button" data-action="export" ${notes.length?'':'disabled'}>${icon('download')} Export JSON</button></div><p>What you heard. What you wondered. Stored in this browser, under your control.</p></section>${notes.length ? `<div class="notebook-grid">${notes.map(n => `<article class="notebook-card"><div class="note-top"><span>${byId[n.experiment]?.number || '—'} / ${esc(byId[n.experiment]?.title || 'Listening note')}</span><button class="icon-button" data-delete-note="${esc(n.id)}" aria-label="Delete this note">${icon('close')}</button></div><h2>${esc(n.title || 'A small discovery')}</h2><p class="note-text">${esc(n.observation || '')}</p>${n.type === 'challenge' ? `<span class="note-badge">Challenge result · ${esc(n.result?.status || 'saved')}</span>` : ''}<details><summary>Experiment settings</summary><pre>${esc(JSON.stringify(n.type === 'challenge' ? n.result : n.params,null,2))}</pre></details><footer><time datetime="${esc(n.createdAt)}">${new Date(n.createdAt).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})}</time><a href="#${esc(n.experiment)}">Try again ${icon('arrow')}</a></footer></article>`).join('')}</div>` : `<div class="empty-notebook"><div>${icon('book')}</div><h2>Every good experiment<br>starts with a question.</h2><p>Save observations from any experiment.<br>Your discoveries will collect here.</p><a class="primary-button" href="#explore">Find an experiment ${icon('arrow')}</a></div>`}<div class="notebook-privacy">${icon('info')}<p>No account, cloud sync, or analytics. Clearing this browser’s site data clears these notes, so export anything you want to keep. Up to 300 recent entries are retained.</p></div>`;
 }
 function renderAbout() {
-  main().innerHTML = `<section class="simple-header"><div class="eyebrow">OPEN SOURCE. OPEN EARS.</div><h1>A lab for the curious<span class="heading-dot">.</span></h1><p>No special knowledge required. Just a pair of ears and a willingness to be surprised.</p></section><div class="about-grid"><article><h2>What this is</h2><p>Hearing Lab is a collection of small experiments in sound and perception. The controls are real, the sounds are generated in your browser, and the explanations connect what you hear to what the signal is doing.</p><p>It is built for people of every age. Try it alone, explore it with someone else, or use it to start a conversation in a classroom.</p><h2>Experiment, observe, question</h2><p>Make a prediction before you listen. Change one thing at a time. Repeat anything surprising. If someone hears something different, that is another observation worth exploring.</p><h2>About the listening challenges</h2><p>These are informal listening tasks, with no acoustic calibration. Your headphones, volume, room, and attention all affect the results. The lab does not diagnose hearing, assign a hearing age, or report clinical thresholds.</p><h2>Comfortable listening</h2><p>Start with a low system volume. Every clip is short; Stop and Escape cancel playback. Do not turn up the volume to chase an inaudible tone. A browser cannot know the actual sound level at your ears.</p></article><aside><div class="about-card"><h3>Small footprint. Open by design.</h3><ul><li>11 interactive experiments</li><li>3 listening challenges</li><li>Audio generated on your device</li><li>No microphone or recordings</li><li>No accounts or third-party tracking</li><li>Notebook stored in this browser</li><li>Keyboard and touch controls</li><li>No runtime dependencies</li></ul><a class="outline-button" href="https://github.com/silviot/hearing-lab" target="_blank" rel="noopener noreferrer">GitHub repository ↗</a><a class="source-download" href="./hearing-lab-source.tar.gz" download>Download this version’s complete source ↓</a><p class="license-note">Licensed under GNU AGPL version 3. Modified versions offered over a network must offer their corresponding source under the license.</p></div><div class="about-card"><h3>A few things worth reading</h3><a href="https://www.w3.org/TR/webaudio-1.0/" target="_blank" rel="noopener noreferrer">Web Audio specification ↗</a><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11362506/" target="_blank" rel="noopener noreferrer">Psychoacoustics in the browser ↗</a><a href="https://deutsch.ucsd.edu/psychology/pages.php?i=213" target="_blank" rel="noopener noreferrer">Diana Deutsch’s auditory illusions ↗</a><a href="https://www.mathpsy.uni-tuebingen.de/acoulab/calibration.html" target="_blank" rel="noopener noreferrer">Why calibration matters ↗</a></div></aside></div>`;
+  main().innerHTML = `<section class="simple-header"><div class="eyebrow">OPEN SOURCE. OPEN EARS.</div><h1>A lab for the curious<span class="heading-dot">.</span></h1><p>No special knowledge required. Just a pair of ears and a willingness to be surprised.</p></section><div class="about-grid"><article><h2>What this is</h2><p>Hearing Lab is a collection of small experiments in sound and perception. The controls are real and act on the sound while it plays, the sounds are generated in your browser, and each experiment has a picture that moves with the controls to show what the signal is doing.</p><p>It is built for people of every age. Try it alone, explore it with someone else, or use it to start a conversation in a classroom.</p><h2>Experiment, observe, question</h2><p>Make a prediction before you listen. Change one thing at a time. Repeat anything surprising. If someone hears something different, that is another observation worth exploring.</p><h2>About the listening challenges</h2><p>These are informal listening tasks, with no acoustic calibration. Your headphones, volume, room, and attention all affect the results. The lab does not diagnose hearing, assign a hearing age, or report clinical thresholds.</p><h2>Comfortable listening</h2><p>Start with a low system volume. Experiments play until you stop them, so you can change things while you listen; Stop and Escape silence everything at once, and so does leaving the page. Challenge clips are short. Do not turn up the volume to chase an inaudible tone. A browser cannot know the actual sound level at your ears.</p></article><aside><div class="about-card"><h3>Small footprint. Open by design.</h3><ul><li>11 interactive experiments</li><li>3 listening challenges</li><li>Audio generated on your device</li><li>No microphone or recordings</li><li>No accounts or third-party tracking</li><li>Notebook stored in this browser</li><li>Keyboard and touch controls</li><li>No runtime dependencies</li></ul><a class="outline-button" href="https://github.com/silviot/hearing-lab" target="_blank" rel="noopener noreferrer">GitHub repository ↗</a><a class="source-download" href="./hearing-lab-source.tar.gz" download>Download this version’s complete source ↓</a><p class="license-note">Licensed under GNU AGPL version 3. Modified versions offered over a network must offer their corresponding source under the license.</p></div><div class="about-card"><h3>A few things worth reading</h3><a href="https://www.w3.org/TR/webaudio-1.0/" target="_blank" rel="noopener noreferrer">Web Audio specification ↗</a><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11362506/" target="_blank" rel="noopener noreferrer">Psychoacoustics in the browser ↗</a><a href="https://deutsch.ucsd.edu/psychology/pages.php?i=213" target="_blank" rel="noopener noreferrer">Diana Deutsch’s auditory illusions ↗</a><a href="https://www.mathpsy.uni-tuebingen.de/acoulab/calibration.html" target="_blank" rel="noopener noreferrer">Why calibration matters ↗</a></div></aside></div>`;
 }
 
 function showSetup() {
@@ -189,31 +214,36 @@ function showSetup() {
   dialog.showModal();
 }
 function audioState(state) {
-  const isPlaying = Boolean(state.playing);
+  const isPlaying = Boolean(state.playing), isLive = isPlaying && Boolean(state.live);
   document.querySelector('#audio-status-dot')?.classList.toggle('playing',isPlaying);
-  const status = document.querySelector('#audio-status'); if(status) status.textContent = isPlaying ? 'Listening…' : 'Ready when you are';
-  const button = document.querySelector('#listen-button'); if(button) { button.innerHTML = isPlaying ? `${icon('stop')}<span>Stop sound</span>` : `${icon('play')}<span>Listen</span>`; button.classList.toggle('is-playing',isPlaying); }
+  const status = document.querySelector('#audio-status'); if(status) status.textContent = isLive ? 'Playing. Change anything.' : isPlaying ? 'Listening…' : 'Ready when you are';
+  const button = document.querySelector('#listen-button'); if(button) { button.innerHTML = isLive ? `${icon('stop')}<span>Stop</span>` : `${icon('play')}<span>Play</span>`; button.classList.toggle('is-playing',isLive); button.setAttribute('aria-pressed',String(isLive)); }
+  const badge = document.querySelector('#live-badge'); if(badge) badge.hidden = !isLive;
+  document.querySelector('#picture-panel')?.classList.toggle('is-live',isLive);
   cancelAnimationFrame(animation);
-  if(isPlaying) {
-    playingAt = performance.now(); playingDuration = state.duration || 1;
-    if(byId[active] && !document.querySelector('#setup-dialog')?.open) { visited.add(active); prefs.explored = [...visited]; savePreferences(prefs); document.querySelector(`[data-page="${active}"] .nav-dot`)?.classList.add('visited'); }
-    animatePlayhead();
+  if(isLive) {
+    if(byId[active]) { visited.add(active); prefs.explored = [...visited]; savePreferences(prefs); document.querySelector(`[data-page="${active}"] .nav-dot`)?.classList.add('visited'); }
+    animation = requestAnimationFrame(followLive);
   } else {
-    const line = document.querySelector('.scope-playhead'); if(line) line.setAttribute('opacity','0');
-    if(['interrupted','devicechange','error'].includes(state.reason)) toast('Playback stopped. Check your output and press play when ready.');
+    document.querySelector('.scope-playhead')?.setAttribute('opacity','0');
+    if(shownPitchClass && !isPlaying) updatePicture();
+    if(['interrupted','devicechange','error'].includes(state.reason)) toast('Playback stopped. Check your output and press Play when ready.');
   }
 }
-function animatePlayhead() {
-  const line = document.querySelector('.scope-playhead');
-  if(line && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    const progress = Math.min(1,(performance.now()-playingAt)/(playingDuration*1000));
-    line.setAttribute('x1',String(progress*760)); line.setAttribute('x2',String(progress*760)); line.setAttribute('opacity','.45');
-    if(progress < 1) animation = requestAnimationFrame(animatePlayhead);
+/** While a looping experiment plays, move the scope playhead and keep the picture on the current step. */
+function followLive() {
+  if(!engine.live) return;
+  const info = engine.liveInfo;
+  if(info && info.cycle >= 0) {
+    const line = document.querySelector('.scope-playhead');
+    if(line && !matchMedia('(prefers-reduced-motion: reduce)').matches) { const x = String(info.cycle*760); line.setAttribute('x1',x); line.setAttribute('x2',x); line.setAttribute('opacity','.5'); }
+    if(active === 'shepard' && info.pitchClass !== shownPitchClass) updatePicture();
   }
+  animation = requestAnimationFrame(followLive);
 }
 async function listen() {
-  try { if(engine.state?.playing || document.querySelector('#listen-button')?.classList.contains('is-playing')) engine.stop('stopped'); else await engine.play(active,settings[active],{seed:12345}); }
-  catch(error) { console.error(error); toast('Audio could not start. Check your output and try Listen again.'); }
+  try { if(engine.live) engine.stop('stopped'); else await engine.startLive(active,settings[active],{seed:12345}); }
+  catch(error) { console.error(error); toast('Audio could not start. Check your output and try Play again.'); }
 }
 let toastTimer;
 function toast(message) { const el=document.querySelector('#toast'); el.textContent=message; el.classList.add('visible'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('visible'),4200); }
@@ -256,10 +286,10 @@ app.addEventListener('click', async event => {
   if(target.dataset.paramButton) { const key=target.dataset.paramButton; let v=target.dataset.value; if(typeof settings[active][key]==='number')v=Number(v);else if(typeof settings[active][key]==='boolean')v=v==='true'; changeParameter(key,v,true); return; }
   if(target.dataset.frequency) { changeParameter('frequency',Number(target.dataset.frequency),true);return; }
   if(target.dataset.preset) {
-    engine.stop('preset'); const p=settings[active], preset=target.dataset.preset;
+    const p=settings[active], preset=target.dataset.preset;
     if(active==='phase') Object.assign(p,{source:'sine',mode:'phase',phase:preset==='same'?0:180,routing:preset==='cancel'?'mono':'stereo'});
     if(active==='harmonics') p.harmonics=preset==='full'?[1,.65,.45,.3,.22,.16]:preset==='missing'?[0,.65,.45,.3,.22,.16]:[1,0,0,0,0,0];
-    renderControls();updateVisual();return;
+    renderControls();settingsChanged();return;
   }
   if(target.dataset.checkEar) { try{await engine.play('frequency',{frequency:1000,ear:target.dataset.checkEar,duration:.6});}catch{toast('Audio could not start. Try again.');}return; }
   if(target.dataset.deleteNote) { try{removeNote(target.dataset.deleteNote);updateCount();renderNotebook();toast('Note deleted.');}catch{toast('This note could not be deleted.');}return; }
@@ -270,7 +300,7 @@ app.addEventListener('click', async event => {
     case 'close-setup':engine.stop('setup closed');document.querySelector('#setup-dialog').close();break;
     case 'finish-setup':if(!document.querySelector('#setup-confirm').checked){toast('Check that the level feels quiet and comfortable first.');return;}prefs.setup=true;savePreferences(prefs);document.querySelector('.setup-dot').classList.add('done');engine.stop('setup complete');document.querySelector('#setup-dialog').close();toast('Ready. Keep this comfortable volume as you explore.');break;
     case 'listen':await listen();break;
-    case 'reset':engine.stop('reset');settings[active]=structuredClone(byId[active].defaults);renderWorkbench();toast('Experiment reset.');break;
+    case 'reset':settings[active]=structuredClone(byId[active].defaults);if(currentMode==='explore'){renderControls();settingsChanged();}else renderWorkbench();toast('Experiment reset.');break;
     case 'share':try{const url=new URL(location.href);url.hash=`${active}?${new URLSearchParams({s:JSON.stringify(settings[active])})}`;await navigator.clipboard.writeText(url.href);toast('Experiment link copied. Your notes stay private.');}catch{toast('Clipboard unavailable. You can share this page’s address.');}break;
     case 'export':downloadNotes();toast('Notebook exported as JSON.');break;
     case 'save-note':{
@@ -283,8 +313,8 @@ app.addEventListener('input',event=>{
   const el=event.target;
   if(el.id==='master-volume'){engine.setVolume(Number(el.value)/100);prefs.volume=Number(el.value)/100;savePreferences(prefs);document.querySelector('#volume-value').textContent=`${el.value}%`;return;}
   if(el.id==='experiment-search'){query=el.value;renderCards();return;}
-  if(el.dataset.param){const key=el.dataset.param;const value=el.dataset.log?Math.round(2**Number(el.value)):Number(el.value);changeParameter(key,value);document.querySelector(`#output-${key}`).textContent=formatValue(key,value);el.setAttribute('aria-valuetext',formatValue(key,value));if(active==='spatial'&&key==='pan')document.querySelector('.spatial-track i').style.left=`${50+value*45}%`;if(active==='harmonics'&&key==='fundamental')document.querySelectorAll('.harmonic-control').forEach((c,i)=>{c.querySelector('span').textContent=`${Math.round((i+1)*value)} Hz`;c.querySelector('input').setAttribute('aria-label',`Harmonic ${i+1}, ${Math.round((i+1)*value)} hertz`);});return;}
-  if(el.dataset.harmonic!==undefined){engine.stop('settings changed');settings.harmonics.harmonics[Number(el.dataset.harmonic)]=Number(el.value);el.parentElement.querySelector('output').textContent=`${Math.round(el.value*100)}%`;cancelAnimationFrame(previewFrame);previewFrame=requestAnimationFrame(updateVisual);}
+  if(el.dataset.param){const key=el.dataset.param;const value=el.dataset.log?Math.round(2**Number(el.value)):Number(el.value);changeParameter(key,value);document.querySelector(`#output-${key}`).textContent=formatValue(key,value);el.setAttribute('aria-valuetext',formatValue(key,value));if(active==='harmonics'&&key==='fundamental')document.querySelectorAll('.harmonic-control').forEach((c,i)=>{c.querySelector('span').textContent=`${Math.round((i+1)*value)} Hz`;c.querySelector('input').setAttribute('aria-label',`Harmonic ${i+1}, ${Math.round((i+1)*value)} hertz`);});return;}
+  if(el.dataset.harmonic!==undefined){settings.harmonics.harmonics[Number(el.dataset.harmonic)]=Number(el.value);el.parentElement.querySelector('output').textContent=`${Math.round(el.value*100)}%`;settingsChanged();}
 });
 document.addEventListener('keydown',event=>{if(event.key==='Escape'){engine.stop('stopped');document.querySelector('.sidebar')?.classList.remove('open');syncNavigation();}});
 document.querySelector('.skip-link').addEventListener('click',event=>{event.preventDefault();main().focus();});

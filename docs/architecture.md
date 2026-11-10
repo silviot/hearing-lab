@@ -8,9 +8,11 @@ Hearing Lab is a static application built from native browser ES modules. Node.j
 | --- | --- |
 | `index.html` and app UI | Navigation, labelled controls, explanations, visualizations, setup, notebook, and user actions. |
 | `src/audio/dsp.js` | Generate finite sample buffers, apply envelopes, and report digital peak/RMS values. |
-| `src/audio/engine.js` | Own the audio context, bounded playback, master gain, interruption handling, and stop path. |
+| `src/audio/live.js` | Continuous, sample-by-sample synthesis with smoothed parameters. No DOM or `AudioContext`; `live-worklet.js` wraps it for the audio thread. |
+| `src/audio/engine.js` | Own the audio context, finite clips and the live synth, master gain, interruption handling, and stop path. |
 | `src/lib/catalog.js` | Experiment descriptions, defaults, learning prompts, and reference links. |
-| `src/ui/visuals.js` | Explanatory signal visualizations. |
+| `src/ui/visuals.js` | Icons, the signal scope, and the spectrum view. |
+| `src/ui/pictures.js` | One explanatory picture per experiment, drawn from the current settings. |
 | `src/lib/challenges.js` | Pure challenge state, randomization, adaptive updates, observations, and result summaries. |
 | `src/ui/challenges.js` | Present intervals and response controls; connect challenge state to the audio engine and notebook. |
 | `src/lib/notebook.js` | Store the user's notebook locally; support a downloadable JSON export. |
@@ -21,7 +23,7 @@ Keep signal generation independent of the DOM and `AudioContext` where practical
 
 ## Playback lifecycle
 
-Audio starts after a user action. The engine owns the context, output level, current sources, and stop path. Starting a new sound must retire the previous one. Use bounded sounds, smooth onset/offset envelopes, and a consistent master level; do not compensate for an inaudible frequency by automatically boosting it.
+Audio starts after a user action. The engine owns the context, output level, current sources, and stop path. Starting a new sound must retire the previous one. There are two kinds of sound. Challenge trials and channel checks are bounded rendered clips. The explore workbench plays a live synth until the listener stops it, and a control change is sent to that synth (`updateLive`) instead of stopping it: hearing a change as it happens is the point of the workbench. Use smooth onset/offset envelopes, glide every live parameter, and keep a consistent master level; do not compensate for an inaudible frequency by automatically boosting it.
 
 Schedule the samples or sources against `AudioContext.currentTime`. UI timers may update a display, but do not define fine acoustic timing. Visualizations are explanatory views of generated signals, not measurements made inside the user's ear.
 

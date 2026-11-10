@@ -12,7 +12,7 @@ x[n] = A sin(2π f n/fs + phi)
 
 The renderer uses the actual audio-context sample rate. Tone generation is bounded by `min(20,000 Hz, 0.45 × fs)`, leaving space below Nyquist (`fs/2`). Complex waveforms omit harmonics above that band. The upper bound is a digital synthesis constraint, not a claim about headphone output or human audibility.
 
-Most demonstrations have 20 ms smooth onset and offset ramps. The raised-cosine ramp is equivalent to `sin²(πt / 2T)` for elapsed ramp time `t` from zero to duration `T`. It reduces the broadband transient caused by abruptly switching a signal on. First and last samples are zero. Demonstrations are finite, with an eight-second engine maximum; the UI can request a shorter duration than a generator's default.
+Most demonstrations have 20 ms smooth onset and offset ramps. The raised-cosine ramp is equivalent to `sin²(πt / 2T)` for elapsed ramp time `t` from zero to duration `T`. It reduces the broadband transient caused by abruptly switching a signal on. First and last samples are zero. Rendered clips (challenge trials, channel checks, and the signal drawn in the scope) are finite, with an eight-second engine maximum. The explore workbench instead plays continuously: see *Live playback* below.
 
 The engine's fallback master gain is `0.08`, capped at `0.18`. The app initializes its lab-volume control to 35% of that cap (`0.063` actual gain), or a saved preference. Playback accepts only finite sample values with magnitude at most `0.95`. These are engineering bounds on digital values. They cannot guarantee a particular sound pressure level at the ear.
 
@@ -105,7 +105,7 @@ Generated noise is approximately RMS-matched with a peak ceiling before it is sh
 
 Each step adds sine components separated by octaves. A fixed Gaussian weighting in log-frequency space is centered near 700 Hz. Pitch classes advance or retreat in semitone steps while components fade through this spectral envelope. The default renderer makes twelve 450 ms steps, with 40 ms internal envelopes. A UI setting can use a different overall duration.
 
-This is a finite, stepped Shepard demonstration. Replaying a cycle can suggest continued ascent or descent, but the engine does not run an endless loop. Apparent circularity depends on spectrum, equipment, and listener. The component display describes the generated signal rather than a measured percept.
+This is a stepped Shepard demonstration. The rendered clip is one twelve-step cycle; live playback repeats that cycle until stopped, and a change of direction takes effect at the next step. Apparent circularity depends on spectrum, equipment, and listener. The component display describes the generated signal rather than a measured percept.
 
 ## Wave shape and amplitude
 
@@ -115,9 +115,19 @@ The gain control applies `10^(gainDb/20)` to the waveform. Different shapes are 
 
 ## Frequency and gap explorers
 
-The frequency explorer plays a short sine with the selected channel routing and fixed digital amplitude. Device response can have peaks and dips, so audibility need not vary monotonically with frequency. No maximum hearing frequency is inferred from moving a slider.
+The frequency explorer plays a sine with the selected channel routing and fixed digital amplitude. Device response can have peaks and dips, so audibility need not vary monotonically with frequency. No maximum hearing frequency is inferred from moving a slider.
 
-The gap explorer inserts two gaps in a finite white-noise signal. Its gap value is the fully silent plateau, with an additional 2 ms taper on each side. Zero gap inserts no center dip at all. The explorer is intentionally separate from the scored gap challenge, whose shorter edge ramps are specified below.
+The gap explorer's rendered clip inserts two gaps in a white-noise signal; live playback repeats a gap every two thirds of a second, so the loop matches the drawn clip. Its gap value is the fully silent plateau, with an additional 2 ms taper on each side. Zero gap inserts no center dip at all. The explorer is intentionally separate from the scored gap challenge, whose shorter edge ramps are specified below.
+
+## Live playback
+
+On the explore workbench, Play starts a continuous synthesizer (`src/audio/live.js`) that runs until Stop, Escape, navigation, a hidden page, or an audio interruption. It uses the same formulas, scales, and level targets as the renderers above, computed one sample at a time in an AudioWorklet (or on the main thread through a ScriptProcessor where a browser cannot load the worklet).
+
+Controls act on the sound while it plays. Every numeric parameter glides to its new value through a one-pole smoother with a 12 ms time constant. Switches are modelled as mixes that glide the same way: mono routing is a blend toward `(L + R) / 2`, polarity is a gain moving between +1 and −1, and sources, wave shapes, noise colours, and ear selection are crossfades. A change is therefore a brief transition, not a click and not a restart. Start, stop, and experiment changes use the same glide on an output gate. The output is clamped to the `0.95` ceiling.
+
+Three consequences differ from the rendered clips. Noise levels use the analytic RMS of each generator rather than a per-clip measurement. The masking tone level is set from the nominal noise RMS (`0.07`) and the pulse envelope, not measured per clip. And noise is not repeated from a seed on each loop: it keeps running.
+
+The pictures above the controls are schematic drawings computed from the settings. The scope below them is drawn from a rendered clip with the same settings. Neither is a measurement of the playing audio or of the listener.
 
 ## Listening challenges
 
