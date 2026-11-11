@@ -10,6 +10,23 @@ export function saveNote(note) {
   localStorage.setItem(KEY, JSON.stringify(notes));
   return entry;
 }
+export function upsertNote(note) {
+  const notes = readNotes();
+  const now = new Date().toISOString();
+  const idx = typeof note?.id === 'string' && note.id ? notes.findIndex(n => n.id === note.id) : -1;
+  if (idx !== -1) {
+    const prev = notes[idx];
+    const entry = { ...prev, ...note, id: prev.id, createdAt: prev.createdAt, updatedAt: now, schemaVersion: 1, appVersion: '1.0.0' };
+    notes[idx] = entry;
+    localStorage.setItem(KEY, JSON.stringify(notes));
+    return entry;
+  }
+  const { id: _unusedId, ...rest } = note || {};
+  const id = (typeof note?.id === 'string' && note.id) || globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const entry = { ...rest, id, createdAt: now, updatedAt: now, schemaVersion: 1, appVersion: '1.0.0' };
+  localStorage.setItem(KEY, JSON.stringify([entry, ...notes].slice(0, 300)));
+  return entry;
+}
 export function removeNote(id) { localStorage.setItem(KEY, JSON.stringify(readNotes().filter(n => n.id !== id))); }
 export function readPreferences() { try { const value = JSON.parse(localStorage.getItem(PREFS) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; } catch { return {}; } }
 export function savePreferences(prefs) { try { localStorage.setItem(PREFS, JSON.stringify(prefs)); return true; } catch { return false; } }

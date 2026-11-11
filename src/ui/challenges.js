@@ -12,7 +12,7 @@ const INTERVAL_WAVE = `<svg class="challenge-wave" viewBox="0 0 64 22" aria-hidd
 
 const STYLES = `
 .challenge-shell{color:var(--ink);width:100%}.challenge-card{border:1px solid var(--line);border-radius:14px;padding:clamp(20px,3vw,32px);background:var(--paper);max-width:860px;margin:0 auto}
-.challenge-kicker{font-size:11px;font-weight:650;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}.challenge-card h3{font-size:clamp(22px,3vw,30px);line-height:1.2;margin:0 0 12px}.challenge-copy{line-height:1.65;margin:10px 0;font-size:14.5px}.challenge-note{color:var(--muted);font-size:13px;line-height:1.65;margin:12px 0}.challenge-topline{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;color:var(--muted);margin-bottom:10px}.challenge-progress{height:6px;width:100%;accent-color:var(--accent);margin:0 0 22px;border-radius:99px;overflow:hidden}.challenge-intervals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:20px 0 16px}.challenge-intervals[data-count="2"]{grid-template-columns:repeat(2,minmax(0,1fr))}.challenge-choice{min-height:112px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);font:inherit;cursor:pointer;padding:16px 10px;transition:transform .14s,background .14s,border-color .14s,box-shadow .14s;position:relative}.challenge-choice:not(:disabled):hover{border-color:#96b08c;background:#f7faf2;transform:translateY(-2px);box-shadow:0 6px 16px #1938290d}.challenge-choice span{font-size:22px;font-weight:650;line-height:1}.challenge-choice small{font-size:12.5px;color:var(--muted)}.challenge-choice .challenge-wave{width:52px;height:18px;color:#7a9470;opacity:.45;transition:opacity .15s,transform .15s,color .15s}.challenge-choice:disabled{cursor:default;opacity:.72}.challenge-choice.challenge-active{border-color:var(--accent);background:#e6f0de;box-shadow:0 0 0 2px var(--accent),0 8px 20px #294d371a;opacity:1;transform:translateY(-2px)}.challenge-choice.challenge-active .challenge-wave{opacity:1;color:var(--accent);transform:scale(1.1)}.challenge-choice.challenge-correct{border-color:var(--accent);background:#eaf3e2;opacity:1}.challenge-choice.challenge-wrong{border-color:#c97b63;background:#fbf0ec;opacity:.9}.challenge-choice:focus-visible,.challenge-button:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.challenge-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:18px}.challenge-button{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:10px 16px;min-height:42px;cursor:pointer;font:inherit;font-size:13.5px;font-weight:550;transition:background .15s,border-color .15s}.challenge-button:hover:not(:disabled){background:#eef3e6;border-color:#b8caa8}.challenge-button.challenge-primary{background:var(--accent);color:#fff;border-color:var(--accent)}.challenge-button.challenge-primary:hover:not(:disabled){background:#3a6b56}.challenge-button:disabled{opacity:.5;cursor:default}.challenge-feedback{min-height:46px;font-size:14px;line-height:1.55;margin:12px 0;padding:10px 14px;border-radius:8px;background:#f3f6ec;color:var(--ink)}.challenge-metric{font-size:clamp(36px,6vw,58px);letter-spacing:-.04em;line-height:1.1;margin:18px 0 10px;color:#234233;font-weight:600}.challenge-metric small{font-size:16px;letter-spacing:0;margin-inline-start:8px;color:var(--muted);font-weight:450}.challenge-table{width:100%;border-collapse:collapse;margin:18px 0;font-size:13.5px}.challenge-table th,.challenge-table td{text-align:start;padding:10px 6px;border-bottom:1px solid var(--line)}.challenge-table th{font-size:12px;color:var(--muted);font-weight:600}.challenge-dots{letter-spacing:5px;color:var(--accent);white-space:nowrap}.challenge-error{color:var(--ink);border-inline-start:3px solid #c0563b;padding-inline-start:12px}.challenge-chart-wrap{margin:18px 0;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#f8faf3}.challenge-chart-legend{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:8px}.challenge-chart-legend span{display:inline-flex;align-items:center;gap:5px}.challenge-chart{width:100%;height:auto;display:block;color:var(--ink)}.dot-correct,.dot-miss,.dot-rev{width:8px;height:8px;border-radius:50%;display:inline-block}.dot-correct{background:#315d4b}.dot-miss{border:2px solid #b85d43;background:#fffefa}.dot-rev{border:2px solid #c98a3b}
+.challenge-kicker{font-size:11px;font-weight:650;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}.challenge-card h3{font-size:clamp(22px,3vw,30px);line-height:1.2;margin:0 0 12px}.challenge-copy{line-height:1.65;margin:10px 0;font-size:14.5px}.challenge-note{color:var(--muted);font-size:13px;line-height:1.65;margin:12px 0}.challenge-topline{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;color:var(--muted);margin-bottom:10px}.challenge-progress{height:6px;width:100%;accent-color:var(--accent);margin:0 0 22px;border-radius:99px;overflow:hidden}.challenge-intervals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:20px 0 16px}.challenge-intervals[data-count="2"]{grid-template-columns:repeat(2,minmax(0,1fr))}.challenge-choice{min-height:112px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);font:inherit;cursor:pointer;padding:16px 10px;transition:transform .14s,background .14s,border-color .14s,box-shadow .14s;position:relative}.challenge-choice:not(:disabled):hover{border-color:#96b08c;background:#f7faf2;transform:translateY(-2px);box-shadow:0 6px 16px #1938290d}.challenge-choice span{font-size:22px;font-weight:650;line-height:1}.challenge-choice small{font-size:12.5px;color:var(--muted)}.challenge-choice .challenge-wave{width:52px;height:18px;color:#7a9470;opacity:.45;transition:opacity .15s,transform .15s,color .15s}.challenge-choice:disabled{cursor:default;opacity:.72}.challenge-choice.challenge-active{border-color:var(--accent);background:#e6f0de;box-shadow:0 0 0 2px var(--accent),0 8px 20px #294d371a;opacity:1;transform:translateY(-2px)}.challenge-choice.challenge-active .challenge-wave{opacity:1;color:var(--accent);transform:scale(1.1)}.challenge-choice.challenge-correct{border-color:var(--accent);background:#eaf3e2;opacity:1}.challenge-choice.challenge-wrong{border-color:#c97b63;background:#fbf0ec;opacity:.9}.challenge-choice:focus-visible,.challenge-button:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.challenge-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:18px}.challenge-button{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:10px 16px;min-height:42px;cursor:pointer;font:inherit;font-size:13.5px;font-weight:550;transition:background .15s,border-color .15s}.challenge-button:hover:not(:disabled){background:#eef3e6;border-color:#b8caa8}.challenge-button.challenge-primary{background:var(--accent);color:#fff;border-color:var(--accent)}.challenge-button.challenge-primary:hover:not(:disabled){background:#3a6b56}.challenge-button:disabled{opacity:.5;cursor:default}.challenge-saved{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:550;color:#2f5e41;background:#eaf3e2;border:1px solid #c6dbba;border-radius:99px;padding:8px 14px}.challenge-feedback{min-height:46px;font-size:14px;line-height:1.55;margin:12px 0;padding:10px 14px;border-radius:8px;background:#f3f6ec;color:var(--ink)}.challenge-metric{font-size:clamp(36px,6vw,58px);letter-spacing:-.04em;line-height:1.1;margin:18px 0 10px;color:#234233;font-weight:600}.challenge-metric small{font-size:16px;letter-spacing:0;margin-inline-start:8px;color:var(--muted);font-weight:450}.challenge-table{width:100%;border-collapse:collapse;margin:18px 0;font-size:13.5px}.challenge-table th,.challenge-table td{text-align:start;padding:10px 6px;border-bottom:1px solid var(--line)}.challenge-table th{font-size:12px;color:var(--muted);font-weight:600}.challenge-dots{letter-spacing:5px;color:var(--accent);white-space:nowrap}.challenge-error{color:var(--ink);border-inline-start:3px solid #c0563b;padding-inline-start:12px}.challenge-chart-wrap{margin:18px 0;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#f8faf3}.challenge-chart-legend{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:8px}.challenge-chart-legend span{display:inline-flex;align-items:center;gap:5px}.challenge-chart{width:100%;height:auto;display:block;color:var(--ink)}.dot-correct,.dot-miss,.dot-rev{width:8px;height:8px;border-radius:50%;display:inline-block}.dot-correct{background:#315d4b}.dot-miss{border:2px solid #b85d43;background:#fffefa}.dot-rev{border:2px solid #c98a3b}
 `;
 
 function freshSeed() {
@@ -112,8 +112,10 @@ export function mountChallenge(container, { kind, engine, onSave, onChange } = {
       const replays = result.trials.reduce((sum, trial) => sum + (trial.replays || 0), 0);
       body = `<p class="challenge-kicker">${escapeText(status)}</p>${value == null ? '' : `<div class="challenge-metric">${escapeText(formatNumber(value, value < 10 ? 2 : 1))}<small>${escapeText(label)}</small></div>`}<p class="challenge-copy">${escapeText(explanation)}</p>${staircaseChart(result.trials, result.reversals, kind)}${kind === 'pitch' && value != null ? `<p class="challenge-note">${escapeText(t('challenges.pitchHzNote', { hz: formatNumber(result.metrics.differenceHz, 2) }))}</p>` : ''}${kind === 'gap' ? `<p class="challenge-note">${escapeText(t('challenges.gapTaperNote'))}</p>` : ''}<p class="challenge-note">${escapeText(t('challenges.summaryStats', { trials: result.trials.length, reversals: result.reversals.length, replays }))}</p>`;
     }
-    const saveText = saved ? t('challenges.resultSaved') : saving ? t('challenges.saving') : t('challenges.saveResult');
-    return `${body}${result.volumeChanged ? `<p class="challenge-note challenge-error">${escapeText(t('challenges.volumeChangedWarn'))}</p>` : ''}<div class="challenge-actions"><button type="button" class="challenge-button challenge-primary" data-action="save" ${saved || saving ? 'disabled' : ''}>${escapeText(saveText)}</button><button type="button" class="challenge-button" data-action="restart">${escapeText(t('challenges.tryAgain'))}</button></div>`;
+    const saveControl = saved
+      ? `<span class="challenge-saved" role="status">✓ ${escapeText(t('challenges.resultSaved'))}</span>`
+      : `<button type="button" class="challenge-button challenge-primary" data-action="save" ${saving ? 'disabled' : ''}>${escapeText(saving ? t('challenges.saving') : t('challenges.saveResult'))}</button>`;
+    return `${body}${result.volumeChanged ? `<p class="challenge-note challenge-error">${escapeText(t('challenges.volumeChangedWarn'))}</p>` : ''}<div class="challenge-actions">${saveControl}<button type="button" class="challenge-button${saved ? ' challenge-primary' : ''}" data-action="restart">${escapeText(t('challenges.tryAgain'))}</button></div>`;
   }
 
   function render() {
@@ -248,6 +250,22 @@ export function mountChallenge(container, { kind, engine, onSave, onChange } = {
     render(); notify(); focusAction('start');
   }
 
+  async function persistResult() {
+    if (!result || saved || saving) return;
+    if (!onSave) { saved = true; render(); focusAction('restart'); return; }
+    const savingResult = result;
+    saving = true; error = ''; render();
+    try {
+      const outcome = await onSave(savingResult);
+      if (outcome === false) throw new Error(t('challenges.saveError'));
+      if (alive && result === savingResult) saved = true;
+    } catch (cause) {
+      if (alive && result === savingResult) error = cause?.message || t('challenges.saveError');
+    } finally {
+      if (alive && result === savingResult) { saving = false; render(); focusAction(saved ? 'restart' : 'save'); }
+    }
+  }
+
   async function action(event) {
     const button = event.target.closest?.('button[data-action]');
     if (!button || !container.contains(button) || button.disabled) return;
@@ -266,20 +284,11 @@ export function mountChallenge(container, { kind, engine, onSave, onChange } = {
         result.sampleRate = currentTrial.sampleRate;
         result.volumeChanged = new Set(result.trials.flatMap(trial => [trial.masterVolume, trial.masterVolumeEnd])).size > 1;
         if (result.volumeChanged) result.notes.push('The playback volume changed during this run; fixed-level frequency comparisons are not consistent.');
-        phase = 'result'; render(); notify(); focusAction('save');
+        phase = 'result'; notify();
+        await persistResult();
       } else nextTrial();
     } else if (name === 'save' && result && !saved) {
-      const savingResult = result;
-      saving = true; error = ''; render();
-      try {
-        const outcome = await onSave?.(savingResult);
-        if (outcome === false) throw new Error(t('challenges.saveError'));
-        if (alive && result === savingResult) saved = true;
-      } catch (cause) {
-        if (alive && result === savingResult) error = cause?.message || t('challenges.saveError');
-      } finally {
-        if (alive && result === savingResult) { saving = false; render(); focusAction(saved ? 'restart' : 'save'); }
-      }
+      await persistResult();
     }
   }
 

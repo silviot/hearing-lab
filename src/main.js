@@ -2,7 +2,7 @@
 import { AudioEngine } from './audio/engine.js';
 import { renderExperiment } from './audio/dsp.js';
 import { experiments, byId } from './lib/catalog.js';
-import { readNotes, saveNote, removeNote, downloadNotes, readPreferences, savePreferences, escapeHtml as esc } from './lib/notebook.js';
+import { readNotes, saveNote, upsertNote, removeNote, downloadNotes, readPreferences, savePreferences, escapeHtml as esc } from './lib/notebook.js';
 import { icon, heroScope, cardVisual, signalScope, spectrumView, staircaseChart, frequencyMapChart } from './ui/visuals.js';
 import { mountChallenge } from './ui/challenges.js';
 import { picture } from './ui/pictures.js';
@@ -16,7 +16,7 @@ const CATEGORY_IDS = ['all', 'foundations', 'perception', 'challenges', 'illusio
 
 const app = document.querySelector('#app');
 let prefs = readPreferences();
-let active = 'explore', category = 'all', query = '', cleanupChallenge = null, animation = null, previewFrame = null, shownPitchClass = 0, currentMode = 'explore', forceSpectrum = false;
+let active = 'explore', category = 'all', query = '', cleanupChallenge = null, animation = null, previewFrame = null, shownPitchClass = 0, currentMode = 'explore', forceSpectrum = false, activeNoteId = null, noteSaveTimer = null;
 const settings = Object.fromEntries(experiments.map(e => [e.id, structuredClone(e.defaults)]));
 const visited = new Set(Array.isArray(prefs.explored) ? prefs.explored : []);
 const engine = new AudioEngine({ onState: audioState });
@@ -33,7 +33,11 @@ const dictation = new Dictation({
   lang: navigator.language || 'en-US',
   onText: text => {
     const field = document.querySelector('#observation');
-    if (field) { field.value = text; field.scrollTop = field.scrollHeight; }
+    if (field) {
+      field.value = text;
+      field.scrollTop = field.scrollHeight;
+      scheduleNoteAutoSave();
+    }
   },
   onState: dictationState,
   onError: code => toast(t(DICTATION_ERROR_KEYS[code] || 'toasts.dictationStopped')),
@@ -41,6 +45,7 @@ const dictation = new Dictation({
 
 function dictationState(listening) {
   const button = document.querySelector('#dictate-button'), field = document.querySelector('#observation');
+  if (!listening) flushPendingNoteSave();
   if (!button || !field) return;
   button.classList.toggle('is-listening', listening);
   button.setAttribute('aria-pressed', String(listening));
@@ -96,6 +101,12 @@ function shell() {
 }
 
 function renderRoute({ preserveMode = false, preserveScroll = false } = {}) {
+  flushPendingNoteSave();
+  if (!preserveMode) {
+    const prevField = document.querySelector('#observation');
+    if (prevField) prevField.value = '';
+    activeNoteId = null;
+  }
   cleanupChallenge?.(); cleanupChallenge = null;
   dictation.cancel();
   engine.stop('navigation');
@@ -170,9 +181,11 @@ function renderExperimentPage() {
   main().innerHTML = `<section class="experiment-header"><a class="back-link" href="#explore"><span class="dir-arrow" aria-hidden="true">←</span> ${esc(t('workbench.backAll'))}</a><div class="experiment-heading-row"><div><div class="eyebrow"><span class="number-label">${e.number}</span> ${esc(e.categoryLabel.toUpperCase())} <span class="eyebrow-separator">/</span> ${esc(e.time)}</div><h1>${esc(e.title)}<span class="heading-dot">.</span></h1><p>${esc(e.description)}</p></div><span class="large-experiment-icon ${e.color}">${icon(e.icon)}</span></div></section>
   <div class="experiment-layout"><div class="experiment-workbench"><div class="workbench-top"><span class="panel-label">${icon('waves')} ${esc(t('workbench.title'))}</span><div class="workbench-tools">${e.challenge ? `<div class="mode-tabs" role="group" aria-label="${esc(t('workbench.modeAria'))}"><button data-mode="explore" aria-pressed="${currentMode === 'explore'}" class="${currentMode === 'explore' ? 'selected' : ''}">${icon('sliders')} ${esc(t('workbench.modeExplore'))}</button><button data-mode="challenge" aria-pressed="${currentMode === 'challenge'}" class="${currentMode === 'challenge' ? 'selected' : ''}">${icon('target')} ${esc(t('workbench.modeChallenge'))}</button></div>` : ''}<button class="icon-button" data-action="reset" title="${esc(t('workbench.resetTitle'))}" aria-label="${esc(t('workbench.resetAria'))}">${icon('reset')}</button><button class="icon-button" data-action="share" title="${esc(t('workbench.shareTitle'))}" aria-label="${esc(t('workbench.shareAria'))}">${icon('share')}</button></div></div><div id="workbench-body"></div></div>
   <aside class="experiment-guide"><div class="prediction"><span class="tiny-label">${esc(t('workbench.beforePlay'))}</span><h2>${esc(e.question)}</h2><p>${esc(t('workbench.makeGuess'))}</p></div><section class="try-this"><span class="tiny-label">${esc(t('workbench.tryThis'))}</span><ol>${e.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol></section><div class="discovery-fact">${icon('info')}<p>${esc(e.fact)}</p></div></aside></div>
-  <section class="understanding"><div class="explanation"><div class="eyebrow">${esc(t('workbench.behindMagic'))}</div><h2>${esc(t('workbench.whatsHappening'))}</h2><p>${esc(e.explanation)}</p><details><summary>${esc(t('workbench.littleDeeper'))} ${icon('arrow')}</summary><p>${esc(e.detail)}</p><a href="${e.source}" target="_blank" rel="noopener noreferrer">${esc(e.sourceLabel)} <span dir="ltr">↗</span></a></details></div><div class="observation-card"><div class="observation-heading">${icon('book')}<h3>${esc(t('workbench.whatNoticed'))}</h3></div><label class="sr-only" for="observation">${esc(t('workbench.yourObservation'))}</label><textarea id="observation" rows="3" maxlength="1500" placeholder="${esc(t('workbench.obsPlaceholder'))}"></textarea><div class="observation-footer"><span>${esc(t('workbench.savedLocal'))}</span><div class="observation-actions">${dictation.supported ? `<button class="small-button dictate-button" id="dictate-button" data-action="dictate" aria-pressed="false" aria-describedby="dictation-note">${icon('mic')}<span>${esc(t('workbench.dictate'))}</span></button>` : ''}<button class="small-button" data-action="save-note">${esc(t('workbench.saveNote'))} ${icon('arrow')}</button></div></div>${dictation.supported ? `<p class="dictation-note" id="dictation-note">${esc(t('workbench.dictationNote'))}</p>` : ''}</div></section>
+  <section class="understanding"><div class="explanation"><div class="eyebrow">${esc(t('workbench.behindMagic'))}</div><h2>${esc(t('workbench.whatsHappening'))}</h2><p>${esc(e.explanation)}</p><details><summary>${esc(t('workbench.littleDeeper'))} ${icon('arrow')}</summary><p>${esc(e.detail)}</p><a href="${e.source}" target="_blank" rel="noopener noreferrer">${esc(e.sourceLabel)} <span dir="ltr">↗</span></a></details></div><div class="observation-card"><div class="observation-heading">${icon('book')}<h3>${esc(t('workbench.whatNoticed'))}</h3></div><label class="sr-only" for="observation">${esc(t('workbench.yourObservation'))}</label><textarea id="observation" data-experiment="${esc(e.id)}" rows="3" maxlength="1500" placeholder="${esc(t('workbench.obsPlaceholder'))}"></textarea><div class="observation-footer"><span id="obs-status" class="obs-status" role="status" aria-live="polite">${esc(t('workbench.autoSaveHint'))}</span><div class="observation-actions">${dictation.supported ? `<button class="small-button dictate-button" id="dictate-button" data-action="dictate" aria-pressed="false" aria-describedby="dictation-note">${icon('mic')}<span>${esc(t('workbench.dictate'))}</span></button>` : ''}<button class="small-button new-note-button" id="new-note-button" data-action="new-note" hidden>+ ${esc(t('workbench.newNote'))}</button></div></div>${dictation.supported ? `<p class="dictation-note" id="dictation-note">${esc(t('workbench.dictationNote'))}</p>` : ''}<div id="experiment-notes" class="experiment-notes" hidden></div></div></section>
   <nav class="next-experiments" aria-label="${esc(t('workbench.keepFollowing'))}"><span>${esc(t('workbench.keepFollowing'))}</span>${nextExps.map(n => `<a href="#${n.id}">${icon(n.icon)} ${esc(n.title)} ${icon('arrow')}</a>`).join('')}</nav>`;
   renderWorkbench();
+  syncObservationUi();
+  renderExperimentNotes();
 }
 
 function renderWorkbench() {
@@ -195,6 +208,7 @@ function renderWorkbench() {
             setup: setupSnapshot(),
           });
           updateCount();
+          renderExperimentNotes();
           toast(t('toasts.challengeSaved'));
         } catch {
           toast(t('toasts.saveFailed'));
@@ -447,6 +461,95 @@ function formatNoteSummary(n) {
   return '';
 }
 
+function syncObservationUi() {
+  const field = document.querySelector('#observation');
+  const statusEl = document.querySelector('#obs-status');
+  const newBtn = document.querySelector('#new-note-button');
+  if (!field || !statusEl) return;
+  const hasText = Boolean(field.value.trim());
+  const hasSaved = Boolean(activeNoteId && hasText);
+  statusEl.textContent = hasSaved ? `✓ ${t('workbench.autoSaved')}` : t('workbench.autoSaveHint');
+  statusEl.classList.toggle('is-saved', hasSaved);
+  if (newBtn) newBtn.hidden = !hasText;
+}
+
+function commitObservationNote() {
+  clearTimeout(noteSaveTimer);
+  noteSaveTimer = null;
+  const field = document.querySelector('#observation');
+  const expId = field?.dataset.experiment || active;
+  if (!field || !byId[expId]) return;
+  const text = field.value.trim();
+  if (!text) {
+    if (activeNoteId) {
+      try {
+        removeNote(activeNoteId);
+        activeNoteId = null;
+        updateCount();
+      } catch { /* ignore */ }
+    }
+    syncObservationUi();
+    renderExperimentNotes();
+    return;
+  }
+  try {
+    const e = localizedExperiment(byId[expId]);
+    const entry = upsertNote({
+      id: activeNoteId,
+      experiment: expId,
+      title: e.title,
+      type: 'observation',
+      observation: text,
+      params: structuredClone(settings[expId]),
+      setup: setupSnapshot(),
+    });
+    activeNoteId = entry.id;
+    updateCount();
+    syncObservationUi();
+    renderExperimentNotes();
+  } catch {
+    toast(t('toasts.saveFailed'));
+  }
+}
+
+function scheduleNoteAutoSave() {
+  clearTimeout(noteSaveTimer);
+  const newBtn = document.querySelector('#new-note-button');
+  const field = document.querySelector('#observation');
+  if (newBtn && field) newBtn.hidden = !field.value.trim();
+  noteSaveTimer = setTimeout(commitObservationNote, 260);
+}
+
+function flushPendingNoteSave() {
+  if (noteSaveTimer !== null) {
+    commitObservationNote();
+    return;
+  }
+  const field = document.querySelector('#observation');
+  if (field && byId[active] && field.value.trim() && !activeNoteId) {
+    commitObservationNote();
+  }
+}
+
+function renderExperimentNotes() {
+  const host = document.querySelector('#experiment-notes');
+  if (!host || !byId[active]) return;
+  const expNotes = readNotes().filter(n => n.experiment === active);
+  if (!expNotes.length) {
+    host.innerHTML = '';
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+  host.innerHTML = `<div class="exp-notes-header"><h4>${esc(t('workbench.notesOnPage'))} <span class="count-pill">${expNotes.length}</span></h4><a href="#notebook" class="exp-notes-all">${esc(t('nav.notebook'))} ${icon('arrow')}</a></div><div class="exp-notes-list">${expNotes.map(n => {
+    const isEditing = n.id === activeNoteId;
+    const dateStr = new Date(n.createdAt).toLocaleDateString(getLanguage(), { day: 'numeric', month: 'short', year: 'numeric' });
+    const canEdit = n.type !== 'challenge';
+    const canRestore = Boolean(n.params && n.type !== 'challenge');
+    return `<article class="exp-note-item${isEditing ? ' is-editing' : ''}"><div class="exp-note-top"><time datetime="${esc(n.createdAt)}">${esc(dateStr)}</time><div class="exp-note-actions">${canEdit && !isEditing ? `<button type="button" class="exp-note-btn" data-edit-note="${esc(n.id)}">${esc(t('workbench.editNote'))}</button>` : ''}${canRestore ? `<button type="button" class="exp-note-btn" data-restore-note="${esc(n.id)}">${icon('reset')} ${esc(t('workbench.applySettings'))}</button>` : ''}<button type="button" class="icon-button exp-note-del" data-delete-note="${esc(n.id)}" aria-label="${esc(t('notebook.deleteAria'))}">${icon('close')}</button></div></div>${n.type === 'challenge' ? `<span class="note-badge">${esc(t('notebook.challengeBadge', { status: n.result?.status || 'saved' }))}</span>` : ''}<p class="exp-note-text"${canEdit ? ` data-edit-note="${esc(n.id)}"` : ''}>${esc(n.observation || '')}</p>${formatNoteSummary(n)}</article>`;
+  }).join('')}</div>`;
+}
+
 function renderNotebook() {
   const notes = readNotes();
   main().innerHTML = `<section class="simple-header"><div class="eyebrow">${esc(t('notebook.eyebrow'))}</div><div class="title-and-action"><h1>${esc(t('notebook.title'))}<span class="heading-dot">.</span></h1><button class="outline-button" data-action="export" ${notes.length ? '' : 'disabled'}>${icon('download')} ${esc(t('notebook.exportJson'))}</button></div><p>${esc(t('notebook.subtitle'))}</p></section>${notes.length ? `<div class="notebook-grid">${notes.map(n => {
@@ -622,8 +725,10 @@ window.addEventListener('pointercancel', () => { activeDrag = null; });
 
 app.addEventListener('change', async event => {
   if (event.target.id === 'language-select') {
+    flushPendingNoteSave();
     const newLang = event.target.value;
     const savedObs = document.querySelector('#observation')?.value || '';
+    const savedNoteId = activeNoteId;
     const scrollY = window.scrollY;
     prefs.lang = newLang;
     savePreferences(prefs);
@@ -633,7 +738,12 @@ app.addEventListener('change', async event => {
     document.querySelector('#setup-dialog').addEventListener('cancel', () => engine.stop('setup closed'));
     renderRoute({ preserveMode: true, preserveScroll: true });
     const obsField = document.querySelector('#observation');
-    if (obsField && savedObs) obsField.value = savedObs;
+    if (obsField && savedObs) {
+      activeNoteId = savedNoteId;
+      obsField.value = savedObs;
+      syncObservationUi();
+      renderExperimentNotes();
+    }
     window.scrollTo({ top: scrollY, behavior: 'instant' });
   }
 });
@@ -648,6 +758,25 @@ app.addEventListener('click', async event => {
     if (typeof settings[active][key] === 'number') v = Number(v);
     else if (typeof settings[active][key] === 'boolean') v = v === 'true';
     changeParameter(key, v, true);
+    return;
+  }
+  const editNoteEl = event.target.closest?.('[data-edit-note]');
+  if (editNoteEl && byId[active]) {
+    if (editNoteEl.tagName !== 'BUTTON' && window.getSelection?.()?.toString()) return;
+    flushPendingNoteSave();
+    dictation.cancel();
+    const note = readNotes().find(x => x.id === editNoteEl.dataset.editNote);
+    if (note && note.type !== 'challenge') {
+      activeNoteId = note.id;
+      const field = document.querySelector('#observation');
+      if (field) {
+        field.value = note.observation || '';
+        field.focus();
+        field.setSelectionRange(field.value.length, field.value.length);
+      }
+      syncObservationUi();
+      renderExperimentNotes();
+    }
     return;
   }
   const target = event.target.closest('button,a');
@@ -694,9 +823,43 @@ app.addEventListener('click', async event => {
     catch { toast(t('toasts.audioTryAgain')); }
     return;
   }
+  if (target.dataset.restoreNote && byId[active]) {
+    const note = readNotes().find(x => x.id === target.dataset.restoreNote);
+    if (note?.params) {
+      loadSharedParams(active, new URLSearchParams({ s: JSON.stringify(note.params) }).toString());
+      if (currentMode !== 'explore') {
+        engine.stop('mode changed');
+        currentMode = 'explore';
+        document.querySelectorAll('[data-mode]').forEach(b => {
+          const sel = b.dataset.mode === 'explore';
+          b.classList.toggle('selected', sel);
+          b.setAttribute('aria-pressed', String(sel));
+        });
+        renderWorkbench();
+      } else {
+        renderControls();
+        settingsChanged();
+      }
+      toast(`${t('workbench.applySettings')} · ${localizedExperiment(byId[active]).title}`);
+    }
+    return;
+  }
   if (target.dataset.deleteNote) {
-    try { removeNote(target.dataset.deleteNote); updateCount(); renderNotebook(); toast(t('toasts.noteDeleted')); }
-    catch { toast(t('toasts.deleteFailed')); }
+    const delId = target.dataset.deleteNote;
+    try {
+      if (delId === activeNoteId) {
+        clearTimeout(noteSaveTimer);
+        noteSaveTimer = null;
+        activeNoteId = null;
+        const field = document.querySelector('#observation');
+        if (field) field.value = '';
+      }
+      removeNote(delId);
+      updateCount();
+      if (active === 'notebook') renderNotebook();
+      else if (byId[active]) { syncObservationUi(); renderExperimentNotes(); }
+      toast(t('toasts.noteDeleted'));
+    } catch { toast(t('toasts.deleteFailed')); }
     return;
   }
   switch (target.dataset.action) {
@@ -736,17 +899,14 @@ app.addEventListener('click', async event => {
       break;
     case 'export': downloadNotes(); toast(t('toasts.exportedJson')); break;
     case 'dictate': if (dictation.listening) dictation.stop(); else dictation.start(document.querySelector('#observation').value); break;
-    case 'save-note': {
+    case 'new-note': {
+      flushPendingNoteSave();
       dictation.cancel();
-      const text = document.querySelector('#observation').value.trim();
-      if (!text) { document.querySelector('#observation').focus(); toast(t('toasts.writeObservationFirst')); return; }
-      try {
-        const e = localizedExperiment(byId[active]);
-        saveNote({ experiment: active, title: e.title, type: 'observation', observation: text, params: structuredClone(settings[active]), setup: setupSnapshot() });
-        updateCount();
-        document.querySelector('#observation').value = '';
-        toast(t('toasts.noteSaved'));
-      } catch { toast(t('toasts.saveFailed')); }
+      activeNoteId = null;
+      const field = document.querySelector('#observation');
+      if (field) { field.value = ''; field.focus(); }
+      syncObservationUi();
+      renderExperimentNotes();
       break;
     }
   }
@@ -765,6 +925,10 @@ app.addEventListener('dblclick', event => {
 
 app.addEventListener('input', event => {
   const el = event.target;
+  if (el.id === 'observation') {
+    if (!event.isComposing) scheduleNoteAutoSave();
+    return;
+  }
   if (el.id === 'master-volume') {
     engine.setVolume(Number(el.value) / 100);
     prefs.volume = Number(el.value) / 100;
@@ -808,6 +972,16 @@ document.addEventListener('keydown', event => {
     listen();
   }
 });
+app.addEventListener('compositionend', event => {
+  if (event.target?.id === 'observation') scheduleNoteAutoSave();
+});
+app.addEventListener('focusout', event => {
+  if (event.target?.id === 'observation') flushPendingNoteSave();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushPendingNoteSave();
+});
+window.addEventListener('pagehide', flushPendingNoteSave);
 document.querySelector('.skip-link')?.addEventListener('click', event => { event.preventDefault(); main()?.focus(); });
 window.addEventListener('resize', syncNavigation);
 window.addEventListener('hashchange', () => renderRoute());
