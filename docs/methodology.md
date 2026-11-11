@@ -139,7 +139,7 @@ Two consecutive correct responses make the task harder; one incorrect response m
 
 Under the stationary assumptions of the transformed up-down method with symmetric steps in log space, this rule targets approximately 70.7% correct. The short app sessions, allowed replay, practice, lapses, and trial caps affect estimation. This target is a property of the procedure, not a pass mark or a promise of statistical confidence.
 
-The target is eight reversals. The final six reversals after the two coarse reversals are averaged geometrically. Four or five available fine reversals permit only a provisional estimate; fewer produce no numeric estimate. Three repeated attempts beyond a stimulus boundary end the run with a boundary result, not a fabricated threshold. Trial-limit termination is preserved in the result.
+The target is four reversals. The final two fine reversals after the two coarse reversals are averaged geometrically. Fewer fine reversals (or stopping early via *Finish early*) produce a provisional result; fewer than two reversals produce no numeric estimate. Three repeated attempts beyond a stimulus boundary end the run with a boundary result, not a fabricated threshold. Trial-limit and early-stop termination are preserved in the result.
 
 | Parameter | Pitch challenge | Gap challenge |
 | --- | --- | --- |
@@ -150,7 +150,7 @@ The target is eight reversals. The final six reversals after the two coarse reve
 | Between intervals | 300 ms silence | 250 ms silence |
 | Outer ramps | 20 ms | 20 ms |
 | Inner gap edges | Not applicable | 0.5 ms additional ramp on each side |
-| Scored-trial cap | 40 | 30 |
+| Scored-trial cap | 18 | 16 |
 | Chance performance | 1 in 2 | 1 in 3 |
 
 Pitch tones use the same digital peak amplitude. Results may also express the difference in cents: `1200 log₂((1000 + Δf)/1000)`. Pitch practice trials are excluded from scored state.
@@ -161,7 +161,7 @@ Gap intervals have equal total duration. Their noise is not amplified to compens
 
 The frequency task uses three intervals; one contains a 350 ms sine and the others contain silence. Intervals are separated by 250 ms. The digital sine peak remains `0.5` before master gain, with 20 ms outer ramps. It samples 250, 500, 1,000, 2,000, 4,000, 8,000, 10,000, and 12,000 Hz, excluding unsupported frequencies above the synthesis band for the actual sample rate.
 
-Three shuffled rounds produce three observations at each frequency. Results show correct responses and trial count at each point. Guessing succeeds one time in three, so three observations are a small field note, not a reliable threshold estimate or highest audible frequency. No hearing age, hearing-loss percentage, or health category is calculated.
+Two shuffled rounds produce two observations at each frequency (listeners may also stop early at any point). Results show correct responses and trial count at each point. Guessing succeeds one time in three, so two observations are a small field note, not a reliable threshold estimate or highest audible frequency. No hearing age, hearing-loss percentage, or health category is calculated.
 
 ## Reading a result
 

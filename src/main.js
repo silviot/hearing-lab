@@ -93,7 +93,7 @@ function shell() {
     <nav class="experiment-nav">${expLinks}</nav>
     <div class="sidebar-bottom"><div class="lab-note">${esc(t('nav.curiosity'))}</div><a href="#about">${icon('info')} <span>${esc(t('nav.aboutLab'))}</span> ${icon('arrow')}</a><a href="./hearing-lab-source.tar.gz" download class="source-link">${esc(t('nav.downloadSource'))} <span>↓</span></a><div class="sidebar-meta"><span class="status-dot"></span> ${esc(t('nav.localAudio'))}</div></div>
   </aside>
-  <div class="main-shell"><header class="topbar"><button class="icon-button menu-button" data-action="menu" aria-label="${esc(t('nav.openMenu'))}">${icon('menu')}</button><div class="breadcrumb"><span>${esc(t('meta.titleSuffix'))}</span><span>/</span><strong id="breadcrumb-current">${esc(t('nav.explore'))}</strong></div><div class="topbar-actions"><div class="lang-picker">${icon('globe')}<select id="language-select" aria-label="${esc(t('nav.languageAria'))}">${langOptions}</select></div><button class="setup-chip" data-action="setup" title="${esc(t('nav.listeningSetup'))}" aria-label="${esc(t('nav.listeningSetup'))}">${icon('headphones')}<span class="setup-chip-label">${esc(t('nav.listeningSetup'))}</span><span class="setup-dot ${prefs.setup ? 'done' : ''}"></span></button><a class="github-link" href="https://github.com/silviot/hearing-lab" target="_blank" rel="noopener noreferrer">AGPLv3 <span dir="ltr">↗</span></a></div></header>
+  <div class="main-shell"><header class="topbar"><button class="icon-button menu-button" data-action="menu" aria-label="${esc(t('nav.openMenu'))}">${icon('menu')}</button><div class="breadcrumb"><a href="#explore" class="breadcrumb-home">${esc(t('meta.titleSuffix'))}</a><span>/</span><strong id="breadcrumb-current">${esc(t('nav.explore'))}</strong></div><div class="topbar-actions"><div class="lang-picker">${icon('globe')}<select id="language-select" aria-label="${esc(t('nav.languageAria'))}">${langOptions}</select></div><button class="setup-chip" data-action="setup" title="${esc(t('nav.listeningSetup'))}" aria-label="${esc(t('nav.listeningSetup'))}">${icon('headphones')}<span class="setup-chip-label">${esc(t('nav.listeningSetup'))}</span><span class="setup-dot ${prefs.setup ? 'done' : ''}"></span></button><a class="github-link" href="https://github.com/silviot/hearing-lab" target="_blank" rel="noopener noreferrer">AGPLv3 <span dir="ltr">↗</span></a></div></header>
   <main id="main-content" tabindex="-1"></main>
   <footer class="page-footer"><span>${esc(t('nav.footerLeft'))}</span><span>${esc(t('nav.footerRight'))}</span></footer></div>
   <div class="audio-dock" aria-label="${esc(t('dock.aria'))}"><div class="dock-status"><span id="audio-status-dot" class="status-dot"></span><span id="audio-status">${esc(t('dock.ready'))}</span></div><div class="dock-volume">${icon('volume')}<label for="master-volume">${esc(t('dock.labVolume'))}</label><input id="master-volume" type="range" min="0" max="100" value="${volPct}" style="--progress:${volPct}%" aria-label="${esc(t('dock.volumeAria'))}"><output id="volume-value" dir="ltr">${volPct}%</output></div><button class="stop-button" data-action="stop" title="${esc(t('dock.stopTitle'))}">${icon('stop')} ${esc(t('dock.stop'))} <kbd>esc</kbd></button></div>
@@ -178,7 +178,7 @@ function renderExperimentPage() {
   const e = localizedExperiment(byId[active]);
   const idx = experiments.findIndex(x => x.id === e.id);
   const nextExps = [experiments[(idx + 1) % experiments.length], experiments[(idx + 2) % experiments.length]].map(localizedExperiment);
-  main().innerHTML = `<section class="experiment-header"><a class="back-link" href="#explore"><span class="dir-arrow" aria-hidden="true">←</span> ${esc(t('workbench.backAll'))}</a><div class="experiment-heading-row"><div><div class="eyebrow"><span class="number-label">${e.number}</span> ${esc(e.categoryLabel.toUpperCase())} <span class="eyebrow-separator">/</span> ${esc(e.time)}</div><h1>${esc(e.title)}<span class="heading-dot">.</span></h1><p>${esc(e.description)}</p></div><span class="large-experiment-icon ${e.color}">${icon(e.icon)}</span></div></section>
+  main().innerHTML = `<section class="experiment-header"><div class="experiment-heading-row"><div><div class="experiment-meta-row"><a class="back-link" href="#explore"><span class="dir-arrow" aria-hidden="true">←</span> ${esc(t('workbench.backAll'))}</a><span class="meta-dot" aria-hidden="true">·</span><div class="eyebrow"><span class="number-label">${e.number}</span> ${esc(e.categoryLabel.toUpperCase())} <span class="eyebrow-separator">/</span> ${esc(e.time)}</div></div><h1>${esc(e.title)}<span class="heading-dot">.</span></h1><p>${esc(e.description)}</p></div><span class="large-experiment-icon ${e.color}">${icon(e.icon)}</span></div></section>
   <div class="experiment-layout"><div class="experiment-workbench"><div class="workbench-top"><span class="panel-label">${icon('waves')} ${esc(t('workbench.title'))}</span><div class="workbench-tools">${e.challenge ? `<div class="mode-tabs" role="group" aria-label="${esc(t('workbench.modeAria'))}"><button data-mode="explore" aria-pressed="${currentMode === 'explore'}" class="${currentMode === 'explore' ? 'selected' : ''}">${icon('sliders')} ${esc(t('workbench.modeExplore'))}</button><button data-mode="challenge" aria-pressed="${currentMode === 'challenge'}" class="${currentMode === 'challenge' ? 'selected' : ''}">${icon('target')} ${esc(t('workbench.modeChallenge'))}</button></div>` : ''}<button class="icon-button" data-action="reset" title="${esc(t('workbench.resetTitle'))}" aria-label="${esc(t('workbench.resetAria'))}">${icon('reset')}</button><button class="icon-button" data-action="share" title="${esc(t('workbench.shareTitle'))}" aria-label="${esc(t('workbench.shareAria'))}">${icon('share')}</button></div></div><div id="workbench-body"></div></div>
   <aside class="experiment-guide"><div class="prediction"><span class="tiny-label">${esc(t('workbench.beforePlay'))}</span><h2>${esc(e.question)}</h2><p>${esc(t('workbench.makeGuess'))}</p></div><section class="try-this"><span class="tiny-label">${esc(t('workbench.tryThis'))}</span><ol>${e.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol></section><div class="discovery-fact">${icon('info')}<p>${esc(e.fact)}</p></div></aside></div>
   <section class="understanding"><div class="explanation"><div class="eyebrow">${esc(t('workbench.behindMagic'))}</div><h2>${esc(t('workbench.whatsHappening'))}</h2><p>${esc(e.explanation)}</p><details><summary>${esc(t('workbench.littleDeeper'))} ${icon('arrow')}</summary><p>${esc(e.detail)}</p><a href="${e.source}" target="_blank" rel="noopener noreferrer">${esc(e.sourceLabel)} <span dir="ltr">↗</span></a></details></div><div class="observation-card"><div class="observation-heading">${icon('book')}<h3>${esc(t('workbench.whatNoticed'))}</h3></div><label class="sr-only" for="observation">${esc(t('workbench.yourObservation'))}</label><textarea id="observation" data-experiment="${esc(e.id)}" rows="3" maxlength="1500" placeholder="${esc(t('workbench.obsPlaceholder'))}"></textarea><div class="observation-footer"><span id="obs-status" class="obs-status" role="status" aria-live="polite">${esc(t('workbench.autoSaveHint'))}</span><div class="observation-actions">${dictation.supported ? `<button class="small-button dictate-button" id="dictate-button" data-action="dictate" aria-pressed="false" aria-describedby="dictation-note">${icon('mic')}<span>${esc(t('workbench.dictate'))}</span></button>` : ''}<button class="small-button new-note-button" id="new-note-button" data-action="new-note" hidden>+ ${esc(t('workbench.newNote'))}</button></div></div>${dictation.supported ? `<p class="dictation-note" id="dictation-note">${esc(t('workbench.dictationNote'))}</p>` : ''}<div id="experiment-notes" class="experiment-notes" hidden></div></div></section>
@@ -205,6 +205,7 @@ function renderWorkbench() {
             type: 'challenge',
             result,
             observation: t('notebook.challengeObsDefault'),
+            defaultObservation: true,
             setup: setupSnapshot(),
           });
           updateCount();
@@ -268,13 +269,16 @@ function renderControls() {
     html = `<div class="preset-row"><span>${esc(t('controls.quickDiscoveries'))}</span><button data-preset="same">${esc(t('controls.presetAligned'))}</button><button data-preset="opposite">${esc(t('controls.presetOpposite'))}</button><button data-preset="cancel">${esc(t('controls.presetCancel'))}</button></div>`;
     html += segments('source', t('controls.soundSource'), [['sine', t('controls.sineWave')], ['complex', t('controls.complexTone')], ['noise', t('controls.noise')]]);
     html += `<div class="two-controls">${segments('mode', t('controls.whatChanges'), [...(p.source === 'sine' ? [['phase', t('controls.phase')]] : []), ['polarity', t('controls.polarity')], ['delay', t('controls.delay')]])}${segments('routing', t('controls.whereGoes'), [['stereo', t('controls.separateEars')], ['mono', t('controls.mixMono')]])}</div>`;
-    if (p.source !== 'noise') html += range('frequency', t('controls.frequency'), 125, 2000, 1, true);
-    if (p.mode === 'phase') html += range('phase', t('controls.relativePhase'), 0, 360, 1, false, t('controls.oneCycle'));
-    else if (p.mode === 'polarity') html += segments('phase', t('controls.rightPolarity'), [[0, t('controls.matching')], [180, t('controls.upsideDown')]]);
-    else html += range('delayMs', t('controls.rightDelay'), 0, 2, .05);
+    const second = p.mode === 'phase'
+      ? range('phase', t('controls.relativePhase'), 0, 360, 1, false, t('controls.oneCycle'))
+      : p.mode === 'polarity'
+        ? segments('phase', t('controls.rightPolarity'), [[0, t('controls.matching')], [180, t('controls.upsideDown')]])
+        : range('delayMs', t('controls.rightDelay'), 0, 2, .05);
+    html += p.source !== 'noise'
+      ? `<div class="two-controls">${range('frequency', t('controls.frequency'), 125, 2000, 1, true)}${second}</div>`
+      : second;
   } else if (active === 'beats') {
-    html = range('frequency', t('controls.firstTone'), 100, 800, 1, true)
-      + range('difference', t('controls.freqSpacing'), .5, 20, .5, false, t('controls.setsBeatRate'))
+    html = `<div class="two-controls">${range('frequency', t('controls.firstTone'), 100, 800, 1, true)}${range('difference', t('controls.freqSpacing'), .5, 20, .5, false, t('controls.setsBeatRate'))}</div>`
       + segments('routing', t('controls.listenTones'), [['together', t('controls.mixedTogether')], ['separate', t('controls.oneEachEar')]]);
   } else if (active === 'harmonics') {
     html = `<div class="preset-row"><span>${esc(t('controls.quickDiscoveries'))}</span><button data-preset="full">${esc(t('controls.presetFullHarmonics'))}</button><button data-preset="missing">${esc(t('controls.presetMissingFund'))}</button><button data-preset="pure">${esc(t('controls.presetPureTone'))}</button></div>`
@@ -282,17 +286,14 @@ function renderControls() {
     html += `<div class="harmonic-bank">${p.harmonics.map((v, i) => `<div class="harmonic-control" style="--h-level:${Math.round(v * 100)}%"><output dir="ltr">${Math.round(v * 100)}%</output><div class="harmonic-fader-wrap"><div class="harmonic-bar-fill" aria-hidden="true"></div><input type="range" data-harmonic="${i}" aria-label="${esc(t('controls.harmonicAria', { n: i + 1, hz: Math.round((i + 1) * p.fundamental) }))}" min="0" max="1" step=".01" value="${v}" title="${esc(t('workbench.doubleClickReset'))}"></div><button type="button" class="harmonic-label-btn" data-toggle-harmonic="${i}" title="${esc(t('controls.toggleHarmonic', { n: i + 1 }))}"><strong dir="ltr">${i === 0 ? 'F₀' : `${i + 1}×`}</strong><span dir="ltr">${Math.round((i + 1) * p.fundamental)} Hz</span></button></div>`).join('')}</div><p class="control-hint">${esc(t('controls.harmonicHint'))}</p>`;
   } else if (active === 'amplitude') {
     html = segments('shape', t('controls.waveShape'), [['sine', t('controls.sine')], ['triangle', t('controls.triangle')], ['square', t('controls.square')], ['sawtooth', t('controls.sawtooth')]])
-      + range('frequency', t('controls.frequency'), 100, 1000, 1, true)
-      + range('gainDb', t('controls.relativeGain'), -30, 0, 1, false, t('controls.signalRatioHint'));
+      + `<div class="two-controls">${range('frequency', t('controls.frequency'), 100, 1000, 1, true)}${range('gainDb', t('controls.relativeGain'), -30, 0, 1, false, t('controls.signalRatioHint'))}</div>`;
   } else if (active === 'spatial') {
-    html = segments('source', t('controls.soundSource'), [['noise', t('controls.broadbandNoise')], ['sine', t('controls.pureTone')]])
-      + range('pan', t('controls.lrBalance'), -1, 1, .01)
-      + range('delayMs', t('controls.waveDelay'), -1, 1, .025, false, t('controls.rightLagsHint'));
-    if (p.source === 'sine') html += range('frequency', t('controls.toneFreq'), 125, 1500, 1, true);
+    const srcCtrl = segments('source', t('controls.soundSource'), [['noise', t('controls.broadbandNoise')], ['sine', t('controls.pureTone')]]);
+    html = (p.source === 'sine' ? `<div class="two-controls">${srcCtrl}${range('frequency', t('controls.toneFreq'), 125, 1500, 1, true)}</div>` : srcCtrl)
+      + `<div class="two-controls">${range('pan', t('controls.lrBalance'), -1, 1, .01)}${range('delayMs', t('controls.waveDelay'), -1, 1, .025, false, t('controls.rightLagsHint'))}</div>`;
   } else if (active === 'masking') {
-    html = segments('invertTone', t('controls.toneInEars'), [[false, t('controls.matchingTones')], [true, t('controls.oppositeTone')]])
+    html = `<div class="two-controls">${segments('invertTone', t('controls.toneInEars'), [[false, t('controls.matchingTones')], [true, t('controls.oppositeTone')]])}${segments('routing', t('controls.output'), [['stereo', t('controls.separateEars')], ['mono', t('controls.mixMono')]])}</div>`
       + range('snr', t('controls.toneRelNoise'), -30, 0, 1, false, t('controls.lowerHarderHint'))
-      + segments('routing', t('controls.output'), [['stereo', t('controls.separateEars')], ['mono', t('controls.mixMono')]])
       + `<p class="control-hint">${esc(t('controls.maskingHint'))}</p>`;
   } else if (active === 'noise') {
     html = segments('color', t('controls.chooseSpectrum'), [['white', t('controls.white')], ['pink', t('controls.pink')], ['brown', t('controls.brown')]])
@@ -359,7 +360,11 @@ function updateVisual() {
     const visualParams = { ...settings[active], ...(beforeRouting ? { routing: 'stereo' } : {}), ...(fullClip ? {} : { duration: .5 }) };
     const rendered = renderExperiment(active, visualParams, engine.sampleRate || 48000, 12345);
     const showSpectrum = ['noise', 'harmonics', 'amplitude'].includes(active) || forceSpectrum;
-    document.querySelector('#signal-visual').innerHTML = signalScope(rendered, active, settings[active]) + (showSpectrum ? spectrumView(rendered) : '');
+    const sigHost = document.querySelector('#signal-visual');
+    sigHost.classList.toggle('has-spectrum', showSpectrum);
+    sigHost.innerHTML = showSpectrum
+      ? `<div class="signal-pane">${signalScope(rendered, active, settings[active])}</div><div class="spectrum-pane">${spectrumView(rendered)}</div>`
+      : signalScope(rendered, active, settings[active]);
     document.querySelector('#scope-context').textContent = beforeRouting
       ? t('workbench.scopeBeforeRouting')
       : active === 'beats'
@@ -416,6 +421,38 @@ function setupSnapshot() {
   return { labVolume: engine.volume, sampleRate: engine.sampleRate || null, headphonesConfirmed: !!prefs.setup, calibrated: false };
 }
 
+function localizedChallengeStatus(status) {
+  if (status === 'estimate') return t('challenges.statusEstimate');
+  if (status === 'provisional') return t('challenges.statusProvisional');
+  if (status === 'boundary') return t('challenges.statusBoundary');
+  if (status === 'observation') return t('challenges.chartDetections');
+  return t('challenges.resultSaved');
+}
+
+function formatParamValue(expId, key, v) {
+  if (key === 'source') {
+    if (v === 'sine') return expId === 'spatial' ? t('controls.pureTone') : t('controls.sineWave');
+    if (v === 'complex') return t('controls.complexTone');
+    if (v === 'noise') return expId === 'spatial' ? t('controls.broadbandNoise') : t('controls.noise');
+  }
+  if (key === 'mode') {
+    if (v === 'phase') return t('controls.phase');
+    if (v === 'polarity') return t('controls.polarity');
+    if (v === 'delay') return t('controls.delay');
+  }
+  if (key === 'routing') {
+    if (v === 'stereo') return t('controls.separateEars');
+    if (v === 'mono') return t('controls.mixMono');
+    if (v === 'together') return t('controls.mixedTogether');
+    if (v === 'separate') return t('controls.oneEachEar');
+  }
+  if (key === 'shape' && ['sine', 'triangle', 'square', 'sawtooth'].includes(v)) return t(`controls.${v}`);
+  if (key === 'color' && ['white', 'pink', 'brown'].includes(v)) return t(`controls.${v}`);
+  if (key === 'direction') return v === 'down' ? t('controls.alwaysDescending') : t('controls.alwaysAscending');
+  if (key === 'ear') return v === 'left' ? t('controls.leftOnly') : v === 'right' ? t('controls.rightOnly') : t('controls.bothEars');
+  return formatValue(key, v);
+}
+
 function formatNoteSummary(n) {
   if (n.type === 'challenge' && n.result) {
     const r = n.result;
@@ -436,6 +473,7 @@ function formatNoteSummary(n) {
       frequency: t('controls.frequency'),
       fundamental: t('controls.fundamentalFreq'),
       phase: t('controls.phase'),
+      mode: t('controls.whatChanges'),
       difference: t('controls.freqSpacing'),
       delayMs: t('controls.delay'),
       gapMs: t('controls.silentPlateau'),
@@ -454,7 +492,7 @@ function formatNoteSummary(n) {
       .map(([k, v]) => {
         if (k === 'harmonics' && Array.isArray(v)) return `${t('notebook.chipHarmonics')}: ${v.map(x => `${Math.round(x * 100)}%`).join(' / ')}`;
         if (k === 'invertTone') return v ? t('controls.oppositeTone') : t('controls.matchingTones');
-        return `${labels[k] || k}: ${formatValue(k, v)}`;
+        return `${labels[k] || k}: ${formatParamValue(n.experiment, k, v)}`;
       });
     return chips.length ? `<div class="note-chips">${chips.map(c => `<span class="note-chip">${esc(c)}</span>`).join('')}</div>` : '';
   }
@@ -546,7 +584,8 @@ function renderExperimentNotes() {
     const dateStr = new Date(n.createdAt).toLocaleDateString(getLanguage(), { day: 'numeric', month: 'short', year: 'numeric' });
     const canEdit = n.type !== 'challenge';
     const canRestore = Boolean(n.params && n.type !== 'challenge');
-    return `<article class="exp-note-item${isEditing ? ' is-editing' : ''}"><div class="exp-note-top"><time datetime="${esc(n.createdAt)}">${esc(dateStr)}</time><div class="exp-note-actions">${canEdit && !isEditing ? `<button type="button" class="exp-note-btn" data-edit-note="${esc(n.id)}">${esc(t('workbench.editNote'))}</button>` : ''}${canRestore ? `<button type="button" class="exp-note-btn" data-restore-note="${esc(n.id)}">${icon('reset')} ${esc(t('workbench.applySettings'))}</button>` : ''}<button type="button" class="icon-button exp-note-del" data-delete-note="${esc(n.id)}" aria-label="${esc(t('notebook.deleteAria'))}">${icon('close')}</button></div></div>${n.type === 'challenge' ? `<span class="note-badge">${esc(t('notebook.challengeBadge', { status: n.result?.status || 'saved' }))}</span>` : ''}<p class="exp-note-text"${canEdit ? ` data-edit-note="${esc(n.id)}"` : ''}>${esc(n.observation || '')}</p>${formatNoteSummary(n)}</article>`;
+    const obsText = n.type === 'challenge' && n.defaultObservation ? t('notebook.challengeObsDefault') : (n.observation || '');
+    return `<article class="exp-note-item${isEditing ? ' is-editing' : ''}"><div class="exp-note-top"><time datetime="${esc(n.createdAt)}">${esc(dateStr)}</time><div class="exp-note-actions">${canEdit && !isEditing ? `<button type="button" class="exp-note-btn" data-edit-note="${esc(n.id)}">${esc(t('workbench.editNote'))}</button>` : ''}${canRestore ? `<button type="button" class="exp-note-btn" data-restore-note="${esc(n.id)}">${icon('reset')} ${esc(t('workbench.applySettings'))}</button>` : ''}<button type="button" class="icon-button exp-note-del" data-delete-note="${esc(n.id)}" aria-label="${esc(t('notebook.deleteAria'))}">${icon('close')}</button></div></div>${n.type === 'challenge' ? `<span class="note-badge">${esc(t('notebook.challengeBadge', { status: localizedChallengeStatus(n.result?.status) }))}</span>` : ''}<p class="exp-note-text"${canEdit ? ` data-edit-note="${esc(n.id)}"` : ''}>${esc(obsText)}</p>${formatNoteSummary(n)}</article>`;
   }).join('')}</div>`;
 }
 
@@ -557,7 +596,11 @@ function renderNotebook() {
     const tryHref = n.params && n.type !== 'challenge'
       ? `#${esc(n.experiment)}?${new URLSearchParams({ s: JSON.stringify(n.params), mode: 'explore' })}`
       : `#${esc(n.experiment)}`;
-    return `<article class="notebook-card"><div class="note-top"><span>${exp?.number || '—'} / ${esc(exp?.title || t('notebook.listeningNote'))}</span><button class="icon-button" data-delete-note="${esc(n.id)}" aria-label="${esc(t('notebook.deleteAria'))}">${icon('close')}</button></div><h2>${esc(n.title || t('notebook.smallDiscovery'))}</h2><p class="note-text">${esc(n.observation || '')}</p>${n.type === 'challenge' ? `<span class="note-badge">${esc(t('notebook.challengeBadge', { status: n.result?.status || 'saved' }))}</span>` : ''}${formatNoteSummary(n)}<details><summary>${esc(t('notebook.settingsSummary'))}</summary><pre dir="ltr">${esc(JSON.stringify(n.type === 'challenge' ? n.result : n.params, null, 2))}</pre></details><footer><time datetime="${esc(n.createdAt)}">${esc(new Date(n.createdAt).toLocaleDateString(getLanguage(), { day: 'numeric', month: 'short', year: 'numeric' }))}</time><a href="${tryHref}">${esc(t('notebook.tryAgain'))} ${icon('arrow')}</a></footer></article>`;
+    const noteTitle = exp
+      ? (n.type === 'challenge' ? `${exp.title} · ${t('notebook.challengeTitleSuffix')}` : exp.title)
+      : (n.title || t('notebook.smallDiscovery'));
+    const obsText = n.type === 'challenge' && n.defaultObservation ? t('notebook.challengeObsDefault') : (n.observation || '');
+    return `<article class="notebook-card"><div class="note-top"><span>${exp?.number || '—'} / ${esc(exp?.title || t('notebook.listeningNote'))}</span><button class="icon-button" data-delete-note="${esc(n.id)}" aria-label="${esc(t('notebook.deleteAria'))}">${icon('close')}</button></div><h2>${esc(noteTitle)}</h2><p class="note-text">${esc(obsText)}</p>${n.type === 'challenge' ? `<span class="note-badge">${esc(t('notebook.challengeBadge', { status: localizedChallengeStatus(n.result?.status) }))}</span>` : ''}${formatNoteSummary(n)}<details><summary>${esc(t('notebook.settingsSummary'))}</summary><pre dir="ltr">${esc(JSON.stringify(n.type === 'challenge' ? n.result : n.params, null, 2))}</pre></details><footer><time datetime="${esc(n.createdAt)}">${esc(new Date(n.createdAt).toLocaleDateString(getLanguage(), { day: 'numeric', month: 'short', year: 'numeric' }))}</time><a href="${tryHref}">${esc(t('notebook.tryAgain'))} ${icon('arrow')}</a></footer></article>`;
   }).join('')}</div>` : `<div class="empty-notebook"><div>${icon('book')}</div><h2>${esc(t('notebook.emptyTitle1'))}<br>${esc(t('notebook.emptyTitle2'))}</h2><p>${esc(t('notebook.emptyBody1'))}<br>${esc(t('notebook.emptyBody2'))}</p><a class="primary-button" href="#explore">${esc(t('notebook.emptyCta'))} ${icon('arrow')}</a></div>`}<div class="notebook-privacy">${icon('info')}<p>${esc(t('notebook.privacy'))}</p></div>`;
 }
 
@@ -966,6 +1009,26 @@ document.addEventListener('keydown', event => {
     document.querySelector('.sidebar')?.classList.remove('open');
     syncNavigation();
     return;
+  }
+  if (/^(?:ArrowLeft|ArrowRight|Home|End)$/.test(event.key) && !event.altKey && !event.ctrlKey && !event.metaKey) {
+    const group = event.target?.closest?.('.mode-tabs, .category-tabs, .segmented-control, .preset-row, .frequency-presets, .channel-checks');
+    if (group) {
+      const buttons = [...group.querySelectorAll('button:not(:disabled)')];
+      const idx = buttons.indexOf(event.target);
+      if (idx !== -1 && buttons.length > 1) {
+        event.preventDefault();
+        const groupRtl = getComputedStyle(group).direction === 'rtl';
+        let nextIdx = idx;
+        if (event.key === 'Home') nextIdx = 0;
+        else if (event.key === 'End') nextIdx = buttons.length - 1;
+        else {
+          const delta = (event.key === 'ArrowRight' ? 1 : -1) * (groupRtl ? -1 : 1);
+          nextIdx = (idx + delta + buttons.length) % buttons.length;
+        }
+        buttons[nextIdx]?.focus();
+        return;
+      }
+    }
   }
   if (event.key === ' ' && byId[active] && currentMode === 'explore' && !document.querySelector('#setup-dialog[open]') && !event.target.closest?.('button,a,input,textarea,select,summary,[contenteditable]')) {
     event.preventDefault();

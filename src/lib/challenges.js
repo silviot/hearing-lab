@@ -7,14 +7,14 @@
 export const CHALLENGE_PROTOCOLS = Object.freeze({
   pitch: Object.freeze({
     referenceHz: 1000, initial: 100, minimum: 0.5, maximum: 400,
-    targetReversals: 8, coarseReversals: 2, estimateReversals: 6,
-    maxTrials: 40, coarseFactor: 2, fineFactor: Math.SQRT2,
+    targetReversals: 4, coarseReversals: 2, estimateReversals: 2,
+    maxTrials: 18, coarseFactor: 2, fineFactor: Math.SQRT2,
     targetCorrect: Math.SQRT1_2, alternatives: 2, unit: 'Hz',
   }),
   gap: Object.freeze({
     initial: 32, minimum: 1, maximum: 64,
-    targetReversals: 8, coarseReversals: 2, estimateReversals: 6,
-    maxTrials: 30, coarseFactor: 2, fineFactor: Math.SQRT2,
+    targetReversals: 4, coarseReversals: 2, estimateReversals: 2,
+    maxTrials: 16, coarseFactor: 2, fineFactor: Math.SQRT2,
     targetCorrect: Math.SQRT1_2, alternatives: 3, unit: 'ms',
   }),
 });
@@ -99,13 +99,22 @@ export function hzDifferenceToCents(differenceHz, referenceHz = 1000) {
   return 1200 * Math.log2((referenceHz + differenceHz) / referenceHz);
 }
 
+export function stopAdaptiveEarly(state) {
+  if (state.stopped) return state;
+  return { ...state, stopped: true, stopReason: 'stopped-early' };
+}
+
 export function adaptiveResult(state, createdAt = new Date().toISOString()) {
   const fine = state.reversals.slice(state.config.coarseReversals);
   const used = fine.slice(-state.config.estimateReversals);
   const boundary = state.stopReason === 'lower-bound' || state.stopReason === 'upper-bound';
-  // Four fine reversals permit only a provisional summary; fewer give no number.
-  const estimate = !boundary && used.length >= 4
-    ? Math.exp(used.reduce((sum, item) => sum + Math.log(item.value), 0) / used.length)
+  const pool = used.length >= 2
+    ? used
+    : state.reversals.length >= 2
+      ? state.reversals.slice(-2)
+      : [];
+  const estimate = !boundary && pool.length >= 2
+    ? Math.exp(pool.reduce((sum, item) => sum + Math.log(item.value), 0) / pool.length)
     : null;
   const status = boundary ? 'boundary'
     : state.stopReason === 'reversals' && used.length >= state.config.estimateReversals
@@ -136,7 +145,7 @@ export function seededRandom(seed = 1) {
   };
 }
 
-export function frequencySchedule(seed = 1, repetitions = 3, sampleRate = 48000) {
+export function frequencySchedule(seed = 1, repetitions = 2, sampleRate = 48000) {
   if (!Number.isInteger(repetitions) || repetitions < 1 || repetitions > 12) throw new RangeError('Repetitions must be 1–12.');
   const random = seededRandom(seed);
   const frequencies = FREQUENCY_MAP_HZ.filter(hz => hz < sampleRate * 0.45);
@@ -237,8 +246,8 @@ export function frequencyResult(records, createdAt = new Date().toISOString()) {
   return {
     schemaVersion: 1, kind: 'frequency', createdAt, status: 'exploratory',
     metrics: { points },
-    protocol: { alternatives: 3, repetitions: 3, level: 'fixed digital amplitude', amplitude: 0.5, calibration: 'uncalibrated', replayAllowed: true },
+    protocol: { alternatives: 3, repetitions: 2, level: 'fixed digital amplitude', amplitude: 0.5, calibration: 'uncalibrated', replayAllowed: true },
     trials: records.map(item => ({ ...item })),
-    notes: ['Guessing succeeds about one time in three. Three observations per frequency do not establish a hearing threshold or maximum audible frequency.'],
+    notes: ['Guessing succeeds about one time in three. Two observations per frequency do not establish a hearing threshold or maximum audible frequency.'],
   };
 }

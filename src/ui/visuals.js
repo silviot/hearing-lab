@@ -304,14 +304,15 @@ export function spectrumView(rendered) {
 export function staircaseChart(trials = [], reversals = [], kind = 'pitch') {
   if (!Array.isArray(trials) || !trials.length) return '';
   const W = 680, H = 185, x0 = 58, x1 = 656, y0 = 22, y1 = 152;
-  const values = trials.map(tItem => Number(tItem.value)).filter(v => Number.isFinite(v) && v > 0);
+  const valOf = tItem => Number(tItem?.parameter ?? tItem?.value);
+  const values = trials.map(valOf).filter(v => Number.isFinite(v) && v > 0);
   if (!values.length) return '';
   const minV = Math.min(...values) * 0.8, maxV = Math.max(...values) * 1.25;
   const lo = Math.log2(Math.max(0.1, minV)), hi = Math.log2(Math.max(minV + 0.5, maxV));
   const xOf = idx => trials.length === 1 ? (x0 + x1) / 2 : x0 + idx / (trials.length - 1) * (x1 - x0);
   const yOf = val => y1 - (Math.log2(Math.max(0.1, val)) - lo) / Math.max(0.01, hi - lo) * (y1 - y0);
   const revTrials = new Set((reversals || []).map(r => r.trial));
-  const poly = trials.map((tItem, i) => `${i ? 'L' : 'M'}${xOf(i).toFixed(1)},${yOf(tItem.value).toFixed(1)}`).join(' ');
+  const poly = trials.map((tItem, i) => `${i ? 'L' : 'M'}${xOf(i).toFixed(1)},${yOf(valOf(tItem)).toFixed(1)}`).join(' ');
   const unit = kind === 'pitch' ? 'Hz' : 'ms';
   const gridVals = [minV / 0.8, Math.sqrt((minV / 0.8) * (maxV / 1.25)), maxV / 1.25];
   const grids = gridVals.map(v => {
@@ -320,7 +321,7 @@ export function staircaseChart(trials = [], reversals = [], kind = 'pitch') {
     return `<line x1="${x0}" y1="${y.toFixed(1)}" x2="${x1}" y2="${y.toFixed(1)}" stroke="currentColor" stroke-opacity=".1" stroke-dasharray="3 3"/><text x="${x0 - 8}" y="${(y + 3.5).toFixed(1)}" font-size="10" font-family="ui-monospace,monospace" fill="currentColor" opacity=".65" text-anchor="end">${label} ${unit}</text>`;
   }).join('');
   const dots = trials.map((tItem, i) => {
-    const x = xOf(i).toFixed(1), y = yOf(tItem.value).toFixed(1);
+    const x = xOf(i).toFixed(1), y = yOf(valOf(tItem)).toFixed(1);
     const isRev = revTrials.has(tItem.index || i + 1);
     return `${isRev ? `<circle cx="${x}" cy="${y}" r="7.5" fill="none" stroke="#c98a3b" stroke-width="1.6"/>` : ''}<circle cx="${x}" cy="${y}" r="${tItem.correct ? 4.2 : 3.8}" fill="${tItem.correct ? '#315d4b' : '#fffefa'}" stroke="${tItem.correct ? '#315d4b' : '#b85d43'}" stroke-width="2"/>`;
   }).join('');
@@ -340,7 +341,7 @@ export function frequencyMapChart(points = []) {
   const step = (x1 - x0) / Math.max(1, points.length);
   const cols = points.map((p, i) => {
     const cx = x0 + (i + 0.5) * step;
-    const trials = Math.max(1, p.trials || 3);
+    const trials = Math.max(1, p.trials || 2);
     const ratio = (p.correct || 0) / trials;
     const barH = Math.max(4, ratio * 76);
     const pips = Array.from({ length: trials }, (_, k) => {

@@ -219,7 +219,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,su
   padding:10px 11px;
   border-radius:7px;
   color:#63705c;
-  transition:background .15s
+  transition:background .15s,color .15s
 }
 
 .experiment-nav a:hover {
@@ -4514,4 +4514,860 @@ input[type=range]:hover::-webkit-slider-thumb {
   height:auto;
   display:block;
   color:var(--ink)
+}
+
+/* Above-the-fold layout & screen real-estate optimization */
+.sidebar {
+  padding:16px 16px 16px
+}
+
+.brand {
+  padding:0 8px 14px;
+  font-size:23px
+}
+
+.brand-mark {
+  width:34px;
+  height:36px
+}
+
+.brand-mark .icon {
+  width:30px;
+  height:30px
+}
+
+.brand small {
+  margin-top:4px
+}
+
+.sidebar-section {
+  margin:0 0 6px
+}
+
+.primary-nav {
+  gap:2px
+}
+
+.primary-nav a {
+  padding:7px 12px;
+  font-size:13px
+}
+
+.experiments-label {
+  margin-top:14px
+}
+
+.experiment-nav {
+  gap:1px
+}
+
+.experiment-nav a {
+  padding:6.5px 10px;
+  font-size:11.5px;
+  gap:9px
+}
+
+.sidebar-bottom {
+  padding:12px 10px 0
+}
+
+.lab-note {
+  margin-bottom:6px;
+  font-size:11.5px
+}
+
+.sidebar-bottom a {
+  margin-top:7px
+}
+
+.source-download {
+  margin-top:8px!important
+}
+
+.sidebar-meta {
+  margin-top:10px
+}
+
+.main-shell {
+  padding-bottom:50px
+}
+
+.topbar {
+  height:50px;
+  padding:0 28px
+}
+
+.breadcrumb-home {
+  color:inherit;
+  transition:color .15s
+}
+
+.breadcrumb-home:hover {
+  color:var(--accent);
+  text-decoration:underline;
+  text-underline-offset:3px
+}
+
+.setup-chip {
+  padding:5px 10px
+}
+
+.lang-picker {
+  padding:4px 9px
+}
+
+.audio-dock {
+  height:48px;
+  padding:0 28px;
+  gap:18px
+}
+
+.stop-button {
+  padding:5px 9px
+}
+
+#toast {
+  bottom:60px
+}
+
+#main-content {
+  padding:16px 28px 20px
+}
+
+.page-footer {
+  padding:16px 28px 22px
+}
+
+/* Home page above-the-fold proportions */
+.home-intro {
+  margin-bottom:14px
+}
+
+.home-intro .eyebrow {
+  margin-bottom:6px
+}
+
+.home-intro h1 {
+  font-size:clamp(26px,2.4vw,35px);
+  line-height:1.08;
+  letter-spacing:-1.5px
+}
+
+.home-intro p {
+  font-size:13px;
+  line-height:1.5;
+  margin-top:6px
+}
+
+.intro-index>span {
+  font-size:40px
+}
+
+.feature-copy {
+  padding:18px 24px
+}
+
+.feature-copy h2 {
+  font-size:clamp(21px,1.9vw,27px);
+  line-height:1.12;
+  margin-top:8px;
+  letter-spacing:-1px
+}
+
+.feature-copy p {
+  font-size:11.5px;
+  line-height:1.5;
+  margin-top:7px
+}
+
+.feature-button {
+  margin-top:12px;
+  padding:8px 13px;
+  font-size:11px;
+  gap:14px
+}
+
+.feature-foot {
+  margin-top:10px
+}
+
+.feature-visual {
+  padding:14px 22px 12px 0
+}
+
+[dir="rtl"] .feature-visual {
+  padding:14px 0 12px 22px
+}
+
+.scope-labels {
+  margin-bottom:4px
+}
+
+.hero-scope {
+  min-height:105px;
+  max-height:136px;
+  margin-top:4px
+}
+
+.scope-equation {
+  margin-top:4px
+}
+
+.scope-caption {
+  margin-top:6px
+}
+
+.catalog-section {
+  margin-top:18px
+}
+
+.section-heading {
+  margin-bottom:10px
+}
+
+.section-heading h2 {
+  font-size:19px
+}
+
+.catalog-tools {
+  margin-bottom:12px
+}
+
+.category-tab {
+  padding:5px 9px;
+  font-size:10.5px
+}
+
+#experiment-search {
+  padding:6px 10px
+}
+
+.experiment-grid {
+  gap:13px
+}
+
+.experiment-card {
+  padding:15px 17px 13px;
+  min-height:204px
+}
+
+.card-graphic {
+  height:38px;
+  margin:8px -1px 5px
+}
+
+.card-category {
+  margin:5px 0 4px
+}
+
+.experiment-card h3 {
+  font-size:15.5px
+}
+
+.experiment-card p {
+  font-size:11.5px;
+  line-height:1.48;
+  margin-top:4px
+}
+
+.card-bottom {
+  padding-top:12px
+}
+
+.home-note {
+  margin-top:18px;
+  padding:15px 18px
+}
+
+/* Experiment page header & workbench proportions */
+.experiment-meta-row {
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-bottom:4px
+}
+
+.experiment-meta-row .back-link {
+  margin-bottom:0;
+  font-size:11px;
+  gap:6px;
+  color:#5d7352;
+  font-weight:500
+}
+
+.experiment-meta-row .back-link:hover {
+  color:var(--ink)
+}
+
+.experiment-meta-row .meta-dot {
+  color:#b7c0ae;
+  font-size:11px;
+  line-height:1
+}
+
+.experiment-meta-row .eyebrow {
+  margin-bottom:0;
+  font-size:9px
+}
+
+.experiment-heading-row {
+  gap:20px
+}
+
+.experiment-header h1 {
+  font-size:clamp(24px,2.2vw,31px);
+  line-height:1.1;
+  letter-spacing:-1.2px
+}
+
+.experiment-header p {
+  font-size:13px;
+  line-height:1.48;
+  margin-top:4px;
+  max-width:720px
+}
+
+.large-experiment-icon {
+  width:48px;
+  height:48px;
+  border-radius:12px
+}
+
+.large-experiment-icon .icon {
+  width:25px;
+  height:25px
+}
+
+.experiment-layout {
+  margin-top:12px;
+  gap:18px;
+  grid-template-columns:minmax(0,1fr) 248px
+}
+
+.workbench-top {
+  padding:8px 16px;
+  row-gap:6px
+}
+
+.mode-tabs button {
+  padding:5px 10px;
+  font-size:11px
+}
+
+.playback-row {
+  padding:10px 18px;
+  gap:12px
+}
+
+.primary-button {
+  padding:9px 15px
+}
+
+.picture-panel {
+  padding:10px 18px 11px
+}
+
+.picture-top strong {
+  font-size:14px
+}
+
+.picture-scroll {
+  margin-top:7px
+}
+
+.picture-panel figcaption {
+  margin-top:7px;
+  font-size:12.5px;
+  line-height:1.48;
+  max-width:85ch
+}
+
+.experiment-controls {
+  padding:13px 18px 10px
+}
+
+.preset-row {
+  margin-bottom:11px;
+  gap:6px
+}
+
+.preset-row>span {
+  width:auto;
+  margin-bottom:0;
+  margin-inline-end:4px;
+  font-size:8px
+}
+
+.preset-row button {
+  min-height:26px;
+  padding:4px 8px
+}
+
+.control-group {
+  margin:0 0 11px
+}
+
+.control-group:last-child {
+  margin-bottom:4px
+}
+
+.control-group label,.control-group legend {
+  margin-bottom:5px;
+  font-size:12px
+}
+
+.control-group output {
+  font-size:11.5px
+}
+
+input[type=range] {
+  height:16px
+}
+
+.range-endpoints {
+  margin-top:2px
+}
+
+.segmented-control button {
+  min-height:32px;
+  padding:5px 8px;
+  font-size:11.5px
+}
+
+.two-controls {
+  gap:12px
+}
+
+.two-controls .segmented-control button {
+  min-height:31px;
+  padding:5px 6px;
+  font-size:10.5px
+}
+
+.frequency-presets {
+  margin:-4px 0 12px
+}
+
+.harmonic-bank {
+  padding:8px 10px;
+  margin-bottom:6px
+}
+
+.harmonic-fader-wrap {
+  height:66px
+}
+
+.harmonic-fader-wrap input[type=range] {
+  height:58px
+}
+
+.control-hint {
+  line-height:1.5;
+  margin-bottom:4px
+}
+
+.noise-explainer {
+  padding:12px 14px;
+  margin-bottom:10px
+}
+
+.shepard-steps {
+  height:125px;
+  padding:14px 6px 8px;
+  margin-bottom:10px
+}
+
+.scope-panel {
+  padding:10px 18px 9px
+}
+
+.signal-scope {
+  margin-top:6px
+}
+
+.experiment-guide {
+  gap:12px
+}
+
+.prediction {
+  padding:14px 16px
+}
+
+.tiny-label {
+  margin-bottom:7px
+}
+
+.prediction h2 {
+  font-size:17px;
+  line-height:1.25
+}
+
+.prediction p {
+  margin-top:7px;
+  line-height:1.5
+}
+
+.try-this ol {
+  gap:9px
+}
+
+.try-this li {
+  font-size:11.5px;
+  line-height:1.5
+}
+
+.discovery-fact {
+  padding:11px 8px 0
+}
+
+.discovery-fact p {
+  line-height:1.5
+}
+
+.understanding {
+  margin-top:20px;
+  padding-top:18px;
+  gap:28px
+}
+
+.explanation h2 {
+  font-size:21px;
+  margin-bottom:9px
+}
+
+.explanation>p {
+  line-height:1.75
+}
+
+.observation-card {
+  padding:16px 18px
+}
+
+.observation-heading {
+  margin-bottom:10px
+}
+
+.observation-card textarea {
+  min-height:74px
+}
+
+.observation-footer {
+  margin-top:10px
+}
+
+.next-experiments {
+  margin-top:20px;
+  padding:14px 0 4px
+}
+
+.simple-header {
+  padding:2px 0 18px
+}
+
+.simple-header h1 {
+  font-size:clamp(25px,2.3vw,33px);
+  line-height:1.14;
+  letter-spacing:-1.2px
+}
+
+.simple-header>p {
+  margin-top:8px;
+  line-height:1.6
+}
+
+/* Notebook, About & Setup modal compact above-the-fold layout */
+.notebook-grid {
+  gap:14px
+}
+
+.notebook-card {
+  padding:16px 18px
+}
+
+.note-top {
+  margin-bottom:10px
+}
+
+.notebook-card h2 {
+  font-size:18px
+}
+
+.note-text {
+  font-size:12px;
+  line-height:1.65;
+  margin-top:8px
+}
+
+.note-badge {
+  margin-top:10px
+}
+
+.notebook-card details {
+  margin-top:12px
+}
+
+.notebook-card footer {
+  margin-top:14px;
+  padding-top:10px
+}
+
+.empty-notebook {
+  padding:40px 20px
+}
+
+.empty-notebook>div {
+  padding:15px;
+  margin-bottom:14px
+}
+
+.empty-notebook h2 {
+  font-size:24px
+}
+
+.empty-notebook p {
+  margin:10px 0 18px;
+  line-height:1.65
+}
+
+.notebook-privacy {
+  padding:14px 0
+}
+
+.about-grid {
+  gap:34px
+}
+
+.about-grid article h2 {
+  font-size:19px;
+  margin-bottom:8px;
+  margin-top:18px
+}
+
+.about-grid article p {
+  font-size:12.5px;
+  line-height:1.68;
+  margin-bottom:8px
+}
+
+.about-card {
+  padding:18px 20px;
+  margin-bottom:14px
+}
+
+.about-card h3 {
+  font-size:16px;
+  margin-bottom:10px
+}
+
+.about-card ul {
+  line-height:1.85;
+  margin-bottom:14px
+}
+
+.about-card .license-note {
+  margin-top:12px;
+  line-height:1.65
+}
+
+.about-card>a:not(.outline-button) {
+  margin:9px 0
+}
+
+dialog {
+  padding:22px 24px
+}
+
+.setup-hero-icon {
+  width:42px;
+  height:42px;
+  margin-bottom:12px
+}
+
+.setup-hero-icon .icon {
+  width:21px;
+  height:21px
+}
+
+.setup-hero-icon~.eyebrow {
+  margin-bottom:6px
+}
+
+dialog h2 {
+  font-size:23px;
+  margin-bottom:10px
+}
+
+dialog>p {
+  line-height:1.65
+}
+
+.channel-checks {
+  margin:14px 0 12px
+}
+
+.setup-checkbox {
+  margin:14px 0
+}
+
+.setup-done {
+  margin-bottom:10px
+}
+
+@media(min-width:521px) {
+  .picture-svg {
+    max-width:485px;
+    margin:0 auto
+  }
+  .signal-scope,.spectrum-view {
+    max-width:460px;
+    margin-inline:auto
+  }
+}
+
+@media(min-width:760px) {
+  #signal-visual.has-spectrum {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    align-items:end
+  }
+  #signal-visual.has-spectrum .signal-scope,
+  #signal-visual.has-spectrum .spectrum-view {
+    max-width:none;
+    margin-inline:0
+  }
+  #signal-visual.has-spectrum .spectrum-caption {
+    padding-top:0;
+    margin-top:4px;
+    border-top:0
+  }
+}
+
+@media(min-width:1500px) {
+  .sidebar {
+    padding-top:18px
+  }
+  .topbar {
+    height:52px
+  }
+  #main-content {
+    padding-top:18px
+  }
+  .home-intro h1 {
+    font-size:36px
+  }
+  .feature-copy {
+    padding:20px 28px
+  }
+  .feature-copy h2 {
+    font-size:28px
+  }
+  .feature-copy p {
+    font-size:12px
+  }
+  .feature-button {
+    padding:9px 14px;
+    font-size:11.5px
+  }
+  .hero-scope {
+    min-height:115px;
+    max-height:146px
+  }
+  .experiment-card {
+    min-height:214px
+  }
+  .card-graphic {
+    height:42px
+  }
+  .experiment-card h3 {
+    font-size:16.5px
+  }
+  .experiment-layout {
+    grid-template-columns:minmax(0,1fr) 268px
+  }
+  .prediction h2 {
+    font-size:18.5px
+  }
+  .experiment-controls {
+    padding:14px 20px 11px
+  }
+}
+
+@media(max-width:1180px) {
+  .topbar,.audio-dock {
+    padding:0 22px
+  }
+  #main-content {
+    padding:15px 22px 18px
+  }
+  .page-footer {
+    padding:14px 22px 20px
+  }
+  .experiment-layout {
+    grid-template-columns:minmax(0,1fr) 212px;
+    gap:15px
+  }
+  .two-controls {
+    gap:0
+  }
+}
+
+@media(max-width:950px) {
+  .experiment-layout {
+    grid-template-columns:1fr
+  }
+  .two-controls {
+    gap:12px
+  }
+}
+
+@media(max-width:720px) {
+  .sidebar {
+    z-index:45;
+    padding:16px 16px 24px
+  }
+  .topbar,.audio-dock {
+    height:50px;
+    padding:0 18px
+  }
+  #main-content {
+    padding:15px 18px 18px
+  }
+  .page-footer {
+    padding:14px 18px 20px
+  }
+  .experiment-header h1 {
+    font-size:26px
+  }
+}
+
+@media(max-width:480px) {
+  .topbar,.audio-dock {
+    padding:0 14px
+  }
+  .breadcrumb>.breadcrumb-home,.breadcrumb>span:nth-child(2) {
+    display:none
+  }
+  #main-content {
+    padding:14px 14px 16px
+  }
+  .feature-visual {
+    height:115px;
+    padding:0 18px 14px
+  }
+  [dir="rtl"] .feature-visual {
+    padding:0 18px 14px
+  }
+  .hero-scope {
+    min-height:0;
+    max-height:none;
+    height:105px
+  }
+  .experiment-header h1 {
+    font-size:24px
+  }
+  .two-controls {
+    gap:0
+  }
 }

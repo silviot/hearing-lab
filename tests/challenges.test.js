@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  createAdaptiveState, applyAdaptiveResponse, adaptiveResult,
+  createAdaptiveState, applyAdaptiveResponse, stopAdaptiveEarly, adaptiveResult,
   createChallengeTrial, hzDifferenceToCents, frequencySchedule, frequencyResult,
 } from '../src/lib/challenges.js';
 
@@ -57,11 +57,23 @@ test('a simulated listener brackets a known difference without running forever',
   const result = adaptiveResult(state, '2026-01-01T00:00:00.000Z');
   assert.equal(state.stopReason, 'reversals');
   assert.equal(result.status, 'estimate');
-  assert.equal(result.reversals.length, 8);
+  assert.equal(result.reversals.length, 4);
   assert.ok(result.metrics.differenceHz > listenerThreshold / Math.SQRT2);
   assert.ok(result.metrics.differenceHz < listenerThreshold * Math.SQRT2);
-  assert.ok(result.trials.length <= 40);
+  assert.ok(result.trials.length <= 18);
   assert.equal(result.createdAt, '2026-01-01T00:00:00.000Z');
+});
+
+test('stopping early preserves completed trials and marks the result provisional', () => {
+  let state = createAdaptiveState('gap');
+  for (const answer of [true, true, false, true, true, false]) state = applyAdaptiveResponse(state, answer);
+  state = stopAdaptiveEarly(state);
+  assert.equal(state.stopped, true);
+  assert.equal(state.stopReason, 'stopped-early');
+  const result = adaptiveResult(state);
+  assert.equal(result.status, 'provisional');
+  assert.equal(result.trials.length, 6);
+  assert.ok(Number.isFinite(result.metrics.gapMs) && result.metrics.gapMs > 0);
 });
 
 test('musical conversion uses a frequency ratio, not linear Hz', () => {
@@ -134,13 +146,13 @@ test('generated buffers are reproducible, bounded, finite, and softly gated', ()
   assert.throws(() => createChallengeTrial('pitch', { value: NaN }), RangeError);
 });
 
-test('frequency schedule repeats each supported band three times without ordered scanning', () => {
+test('frequency schedule repeats each supported band twice by default without ordered scanning', () => {
   const schedule = frequencySchedule(17);
-  assert.equal(schedule.length, 24);
+  assert.equal(schedule.length, 16);
   assert.deepEqual(schedule, frequencySchedule(17));
-  for (const hz of new Set(schedule)) assert.equal(schedule.filter(value => value === hz).length, 3);
+  for (const hz of new Set(schedule)) assert.equal(schedule.filter(value => value === hz).length, 2);
   assert.notDeepEqual(schedule.slice(0, 8), [...schedule.slice(0, 8)].sort((a, b) => a - b));
-  assert.ok(frequencySchedule(17, 3, 8000).every(hz => hz < 3600));
+  assert.ok(frequencySchedule(17, 2, 8000).every(hz => hz < 3600));
 });
 
 test('frequency results retain observations without inferring an audible cutoff', () => {
