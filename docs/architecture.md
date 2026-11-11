@@ -11,8 +11,9 @@ Hearing Lab is a static application built from native browser ES modules. Node.j
 | `src/audio/live.js` | Continuous, sample-by-sample synthesis with smoothed parameters. No DOM or `AudioContext`; `live-worklet.js` wraps it for the audio thread. |
 | `src/audio/engine.js` | Own the audio context, finite clips and the live synth, master gain, interruption handling, and stop path. |
 | `src/lib/catalog.js` | Experiment descriptions, defaults, learning prompts, and reference links. |
-| `src/ui/visuals.js` | Icons, the signal scope, and the spectrum view. |
-| `src/ui/pictures.js` | One explanatory picture per experiment, drawn from the current settings. |
+| `src/i18n/` | Browser language detection, dynamic locale loading, string interpolation, and RTL metadata across 16 languages. |
+| `src/ui/visuals.js` | Icons, experiment card illustrations, the signal scope, the spectrum view, and challenge summary charts. |
+| `src/ui/pictures.js` | One interactive explanatory picture per experiment, drawn from and connected to the current settings. |
 | `src/lib/challenges.js` | Pure challenge state, randomization, adaptive updates, observations, and result summaries. |
 | `src/ui/challenges.js` | Present intervals and response controls; connect challenge state to the audio engine and notebook. |
 | `src/ui/dictation.js` | Merge words from the browser's speech recognition into the observation note. |

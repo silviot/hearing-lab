@@ -2,7 +2,9 @@
 
 **An open audio playground for curious ears.** Change a sound, hear what happens, and discover a little of the physics and perception behind it.
 
-Hearing Lab brings eleven interactive experiments, three listening challenges, and a personal lab notebook to a browser. It is designed for curious adults and children exploring with an adult: approachable explanations, real controls, and room to experiment.
+Hearing Lab brings eleven interactive experiments, three listening challenges, and a personal lab notebook to a browser. It is designed for curious adults and children exploring with an adult: approachable explanations, real controls, interactive diagrams, and room to experiment.
+
+Available in **16 languages** — English, Español, العربية, Français, Português, Bahasa Indonesia, हिन्दी, اردو, Русский, Deutsch, 中文, Български, Magyar, Română, Italiano, and Hrvatski — automatically matching your browser's preferred language, with a language switcher in the header and full right-to-left layout support for Arabic and Urdu.
 
 ## Explore
 

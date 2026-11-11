@@ -11,6 +11,7 @@ Hearing Lab is an audio activity, but its navigation, instructions, controls, an
 - Respect reduced-motion preferences. Animations illustrate a relationship; they must not be required to answer a challenge.
 - Let listeners respond at their own pace. Challenges measure choices, not reaction time.
 - Keep incorrect answers descriptive. A difficult or inaudible sound may reflect the output equipment, room, fatigue, attention, or the listener.
+- Match the listener's preferred browser language (`navigator.languages`) across 16 supported locales, provide an accessible language switcher at all times, and support right-to-left (`dir="rtl"`) layout for Arabic and Urdu while keeping scientific waveform/frequency axes readable.
 
 These are design and review requirements, not a claim of certified accessibility or compatibility with every assistive technology. [CONTRIBUTING](../CONTRIBUTING.md) describes how to record checks actually performed.
 

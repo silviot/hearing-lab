@@ -1,101 +1,168 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { AudioEngine } from './audio/engine.js';
 import { renderExperiment } from './audio/dsp.js';
-import { experiments, byId, categories } from './lib/catalog.js';
+import { experiments, byId } from './lib/catalog.js';
 import { readNotes, saveNote, removeNote, downloadNotes, readPreferences, savePreferences, escapeHtml as esc } from './lib/notebook.js';
-import { icon, heroScope, cardVisual, signalScope, spectrumView } from './ui/visuals.js';
+import { icon, heroScope, cardVisual, signalScope, spectrumView, staircaseChart, frequencyMapChart } from './ui/visuals.js';
 import { mountChallenge } from './ui/challenges.js';
 import { picture } from './ui/pictures.js';
 import { Dictation, recognitionClass } from './ui/dictation.js';
+import {
+  LANGUAGES, detectLanguage, loadLanguage, getLanguage, getLanguageMeta,
+  isRtl, t, tRaw, localizedExperiment,
+} from './i18n/index.js';
+
+const CATEGORY_IDS = ['all', 'foundations', 'perception', 'challenges', 'illusions'];
 
 const app = document.querySelector('#app');
 let prefs = readPreferences();
-let active = 'explore', category = 'All experiments', query = '', cleanupChallenge = null, animation = null, previewFrame = null, shownPitchClass = 0, currentMode = 'explore';
+let active = 'explore', category = 'all', query = '', cleanupChallenge = null, animation = null, previewFrame = null, shownPitchClass = 0, currentMode = 'explore', forceSpectrum = false;
 const settings = Object.fromEntries(experiments.map(e => [e.id, structuredClone(e.defaults)]));
 const visited = new Set(Array.isArray(prefs.explored) ? prefs.explored : []);
 const engine = new AudioEngine({ onState: audioState });
-const DICTATION_ERRORS = { 'not-allowed': 'Microphone access was refused. Allow it in the browser’s site settings to dictate.', 'service-not-allowed': 'This browser does not allow speech input here.', 'audio-capture': 'No microphone was found.', 'network': 'The browser’s speech service could not be reached.', 'language-not-supported': 'The speech service does not support this browser’s language.', 'no-speech': 'No speech heard. Dictation stopped.' };
+const DICTATION_ERROR_KEYS = {
+  'not-allowed': 'toasts.micRefused',
+  'service-not-allowed': 'toasts.speechNotAllowed',
+  'audio-capture': 'toasts.noMic',
+  'network': 'toasts.speechNetwork',
+  'language-not-supported': 'toasts.speechLangUnsupported',
+  'no-speech': 'toasts.noSpeech',
+};
 const dictation = new Dictation({
-  Recognition: recognitionClass(), lang: navigator.language || 'en-US',
-  onText: text => { const field = document.querySelector('#observation'); if (field) { field.value = text; field.scrollTop = field.scrollHeight; } },
+  Recognition: recognitionClass(),
+  lang: navigator.language || 'en-US',
+  onText: text => {
+    const field = document.querySelector('#observation');
+    if (field) { field.value = text; field.scrollTop = field.scrollHeight; }
+  },
   onState: dictationState,
-  onError: code => toast(DICTATION_ERRORS[code] || 'Dictation stopped unexpectedly. Try again.'),
+  onError: code => toast(t(DICTATION_ERROR_KEYS[code] || 'toasts.dictationStopped')),
 });
+
 function dictationState(listening) {
   const button = document.querySelector('#dictate-button'), field = document.querySelector('#observation');
   if (!button || !field) return;
   button.classList.toggle('is-listening', listening);
   button.setAttribute('aria-pressed', String(listening));
-  button.querySelector('span').textContent = listening ? 'Stop dictating' : 'Dictate';
+  button.querySelector('span').textContent = listening ? t('workbench.stopDictating') : t('workbench.dictate');
   // Typing and dictating into the same text at once would duplicate words.
   field.readOnly = listening;
-  field.placeholder = listening ? 'Listening… say what you noticed.' : 'A prediction, a surprise, a question…';
+  field.placeholder = listening ? t('workbench.obsListening') : t('workbench.obsPlaceholder');
 }
 engine.setVolume(Number.isFinite(prefs.volume) ? Math.min(1, Math.max(0, prefs.volume)) : .35);
 
+function applyLanguageToDocument() {
+  const code = getLanguage();
+  const meta = getLanguageMeta(code);
+  document.documentElement.lang = code;
+  document.documentElement.dir = isRtl(code) ? 'rtl' : 'ltr';
+  dictation.lang = meta.speech;
+  const descMeta = document.querySelector('meta[name="description"]');
+  if (descMeta) descMeta.setAttribute('content', t('meta.description'));
+  const skipLink = document.querySelector('.skip-link');
+  if (skipLink) skipLink.textContent = t('meta.skipLink');
+}
+
 function shell() {
-  app.innerHTML = `<aside class="sidebar" aria-label="Main navigation">
-    <button class="mobile-nav-close icon-button" data-action="menu" aria-label="Close navigation">${icon('close')}</button><a href="#explore" class="brand" aria-label="Hearing Lab home"><span class="brand-mark">${icon('waves')}</span><span>hearing<span class="brand-light">lab</span><small>AN OPEN AUDIO PLAYGROUND</small></span></a>
-    <div class="sidebar-section">YOUR LAB</div>
-    <nav class="primary-nav"><a href="#explore" data-page="explore">${icon('grid')}<span>Explore</span><span class="nav-count">11</span></a><a href="#notebook" data-page="notebook">${icon('book')}<span>Notebook</span><span id="note-count" class="nav-count">${readNotes().length}</span></a></nav>
-    <div class="sidebar-section experiments-label">EXPERIMENTS</div>
-    <nav class="experiment-nav">${experiments.map(e => `<a href="#${e.id}" data-page="${e.id}"><span class="experiment-num">${e.number}</span><span>${e.title}</span><span class="nav-dot ${visited.has(e.id) ? 'visited' : ''}"></span></a>`).join('')}</nav>
-    <div class="sidebar-bottom"><div class="lab-note">Curiosity sounds good.</div><a href="#about">${icon('info')} About this lab ${icon('arrow')}</a><a href="./hearing-lab-source.tar.gz" download class="source-link">Download source <span>↓</span></a><div class="sidebar-meta"><span class="status-dot"></span> LOCAL AUDIO · NO TRACKING</div></div>
+  const volPct = Math.round(engine.volume * 100);
+  const currentLang = getLanguage();
+  const expLinks = experiments.map(raw => {
+    const e = localizedExperiment(raw);
+    return `<a href="#${e.id}" data-page="${e.id}"><span class="experiment-num">${e.number}</span><span>${esc(e.title)}</span><span class="nav-dot ${visited.has(e.id) ? 'visited' : ''}"></span></a>`;
+  }).join('');
+  const langOptions = LANGUAGES.map(l => `<option value="${l.code}" ${l.code === currentLang ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
+  app.innerHTML = `<aside class="sidebar" aria-label="${esc(t('nav.mainAria'))}">
+    <button class="mobile-nav-close icon-button" data-action="menu" aria-label="${esc(t('nav.closeMenu'))}">${icon('close')}</button><a href="#explore" class="brand" aria-label="${esc(t('nav.homeAria'))}"><span class="brand-mark">${icon('waves')}</span><span>hearing<span class="brand-light">lab</span><small>${esc(t('nav.tagline'))}</small></span></a>
+    <div class="sidebar-section">${esc(t('nav.yourLab'))}</div>
+    <nav class="primary-nav"><a href="#explore" data-page="explore">${icon('grid')}<span>${esc(t('nav.explore'))}</span><span class="nav-count">11</span></a><a href="#notebook" data-page="notebook">${icon('book')}<span>${esc(t('nav.notebook'))}</span><span id="note-count" class="nav-count">${readNotes().length}</span></a></nav>
+    <div class="sidebar-section experiments-label">${esc(t('nav.experiments'))}</div>
+    <nav class="experiment-nav">${expLinks}</nav>
+    <div class="sidebar-bottom"><div class="lab-note">${esc(t('nav.curiosity'))}</div><a href="#about">${icon('info')} <span>${esc(t('nav.aboutLab'))}</span> ${icon('arrow')}</a><a href="./hearing-lab-source.tar.gz" download class="source-link">${esc(t('nav.downloadSource'))} <span>↓</span></a><div class="sidebar-meta"><span class="status-dot"></span> ${esc(t('nav.localAudio'))}</div></div>
   </aside>
-  <div class="main-shell"><header class="topbar"><button class="icon-button menu-button" data-action="menu" aria-label="Open navigation">${icon('menu')}</button><div class="breadcrumb"><span>Hearing Lab</span><span>/</span><strong id="breadcrumb-current">Explore</strong></div><div class="topbar-actions"><button class="setup-chip" data-action="setup">${icon('headphones')}<span>Listening setup</span><span class="setup-dot ${prefs.setup ? 'done' : ''}"></span></button><a class="github-link" href="https://github.com/silviot/hearing-lab" target="_blank" rel="noopener noreferrer">AGPLv3 <span>↗</span></a></div></header>
+  <div class="main-shell"><header class="topbar"><button class="icon-button menu-button" data-action="menu" aria-label="${esc(t('nav.openMenu'))}">${icon('menu')}</button><div class="breadcrumb"><span>${esc(t('meta.titleSuffix'))}</span><span>/</span><strong id="breadcrumb-current">${esc(t('nav.explore'))}</strong></div><div class="topbar-actions"><div class="lang-picker">${icon('globe')}<select id="language-select" aria-label="${esc(t('nav.languageAria'))}">${langOptions}</select></div><button class="setup-chip" data-action="setup">${icon('headphones')}<span>${esc(t('nav.listeningSetup'))}</span><span class="setup-dot ${prefs.setup ? 'done' : ''}"></span></button><a class="github-link" href="https://github.com/silviot/hearing-lab" target="_blank" rel="noopener noreferrer">AGPLv3 <span dir="ltr">↗</span></a></div></header>
   <main id="main-content" tabindex="-1"></main>
-  <footer class="page-footer"><span>Made for curious ears. Every age welcome.</span><span>Browser audio · Open source · v1.0</span></footer></div>
-  <div class="audio-dock" aria-label="Audio controls"><div class="dock-status"><span id="audio-status-dot" class="status-dot"></span><span id="audio-status">Ready when you are</span></div><div class="dock-volume">${icon('volume')}<label for="master-volume">Lab volume</label><input id="master-volume" type="range" min="0" max="100" value="${Math.round(engine.volume * 100)}" aria-label="Lab playback volume"><output id="volume-value">${Math.round(engine.volume * 100)}%</output></div><button class="stop-button" data-action="stop" title="Stop all audio (Escape)">${icon('stop')} Stop <kbd>esc</kbd></button></div>
+  <footer class="page-footer"><span>${esc(t('nav.footerLeft'))}</span><span>${esc(t('nav.footerRight'))}</span></footer></div>
+  <div class="audio-dock" aria-label="${esc(t('dock.aria'))}"><div class="dock-status"><span id="audio-status-dot" class="status-dot"></span><span id="audio-status">${esc(t('dock.ready'))}</span></div><div class="dock-volume">${icon('volume')}<label for="master-volume">${esc(t('dock.labVolume'))}</label><input id="master-volume" type="range" min="0" max="100" value="${volPct}" style="--progress:${volPct}%" aria-label="${esc(t('dock.volumeAria'))}"><output id="volume-value" dir="ltr">${volPct}%</output></div><button class="stop-button" data-action="stop" title="${esc(t('dock.stopTitle'))}">${icon('stop')} ${esc(t('dock.stop'))} <kbd>esc</kbd></button></div>
   <dialog id="setup-dialog" aria-labelledby="setup-title"></dialog>`;
 }
 
-function renderRoute() {
+function renderRoute({ preserveMode = false, preserveScroll = false } = {}) {
   cleanupChallenge?.(); cleanupChallenge = null;
   dictation.cancel();
   engine.stop('navigation');
   cancelAnimationFrame(animation);
   const [route, encoded] = location.hash.slice(1).split('?');
-  active = byId[route] || ['explore','notebook','about'].includes(route) ? route : 'explore';
-  if (byId[active] && encoded) loadSharedParams(active, encoded);
-  document.querySelectorAll('[data-page]').forEach(a => { const selected = a.dataset.page === active; a.classList.toggle('active', selected); if (selected) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
-  document.querySelector('.sidebar').classList.remove('open');
+  active = byId[route] || ['explore', 'notebook', 'about'].includes(route) ? route : 'explore';
+  if (byId[active] && encoded && !preserveMode) loadSharedParams(active, encoded);
+  document.querySelectorAll('[data-page]').forEach(a => {
+    const selected = a.dataset.page === active;
+    a.classList.toggle('active', selected);
+    if (selected) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  });
+  document.querySelector('.sidebar')?.classList.remove('open');
   syncNavigation();
-  document.querySelector('#breadcrumb-current').textContent = byId[active]?.title || ({ explore: 'Explore', notebook: 'Notebook', about: 'About' }[active]);
-  document.title = `${byId[active]?.title || (active === 'explore' ? 'An open playground for curious ears' : active === 'notebook' ? 'Notebook' : 'About')} — Hearing Lab`;
+  const locExp = byId[active] ? localizedExperiment(byId[active]) : null;
+  const pageTitle = locExp ? locExp.title : ({ explore: t('nav.explore'), notebook: t('nav.notebook'), about: t('nav.about') }[active]);
+  const bc = document.querySelector('#breadcrumb-current');
+  if (bc) bc.textContent = pageTitle;
+  document.title = active === 'explore' ? t('meta.title') : `${pageTitle} — ${t('meta.titleSuffix')}`;
   if (active === 'explore') renderHome();
   else if (active === 'notebook') renderNotebook();
   else if (active === 'about') renderAbout();
-  else { currentMode = byId[active].challenge && active !== 'frequency' ? 'challenge' : 'explore'; renderExperimentPage(); }
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  else {
+    if (!preserveMode) {
+      const modeParam = encoded ? new URLSearchParams(encoded).get('mode') : null;
+      currentMode = modeParam === 'explore' || modeParam === 'challenge'
+        ? (byId[active].challenge ? modeParam : 'explore')
+        : (byId[active].challenge && active !== 'frequency' && !encoded?.includes('s=') ? 'challenge' : 'explore');
+    }
+    renderExperimentPage();
+  }
+  if (!preserveScroll) window.scrollTo({ top: 0, behavior: 'instant' });
 }
+
 function syncNavigation() {
-  const sidebar=document.querySelector('.sidebar');
-  const isMobile=matchMedia('(max-width: 720px)').matches;
-  const open=sidebar.classList.contains('open');
-  sidebar.inert=isMobile&&!open;
-  document.querySelector('.menu-button').setAttribute('aria-expanded',String(open));
+  const sidebar = document.querySelector('.sidebar');
+  if (!sidebar) return;
+  const isMobile = matchMedia('(max-width: 720px)').matches;
+  const open = sidebar.classList.contains('open');
+  sidebar.inert = isMobile && !open;
+  document.querySelector('.menu-button')?.setAttribute('aria-expanded', String(open));
 }
 const main = () => document.querySelector('#main-content');
 
 function renderHome() {
-  main().innerHTML = `<section class="home-intro"><div><div class="eyebrow"><span></span> FOLLOW YOUR EARS</div><h1>Sound is stranger<br>than you think<span class="heading-dot">.</span></h1><p>A hands-on playground for sound and perception.<br class="desktop-break"> Make a prediction. Press play. Turn the knobs while it sounds.</p></div><div class="intro-index"><span>11</span><div>EXPERIMENTS<br>ENDLESS QUESTIONS</div></div></section>
-  <a href="#phase" class="feature-card"><div class="feature-copy"><span class="feature-label">START WITH A LITTLE PARADOX <span>01 / 11</span></span><h2>Can two sounds<br>make silence?</h2><p>One wave. Its opposite. Two ears.<br>Meet the surprisingly strange world of phase.</p><span class="feature-button">Explore phase & polarity ${icon('arrow')}</span><div class="feature-foot">${icon('headphones')} Headphones recommended <span>·</span> 2 minutes</div></div><div class="feature-visual"><div class="scope-labels"><span><i class="left-dot"></i> LEFT</span><span><i class="right-dot"></i> RIGHT</span><span><i class="sum-dot"></i> MONO MIX</span></div>${heroScope()}<div class="scope-equation"><span>+1</span><span>−1</span><span>= 0</span></div><div class="scope-caption">OPPOSITE WAVES · 180° APART</div></div></a>
-  <section class="catalog-section" aria-labelledby="catalog-title"><div class="section-heading"><h2 id="catalog-title">Pick a rabbit hole<span class="count-pill">11</span></h2><span>Small experiments. Big “wait, what?”</span></div><div class="catalog-tools"><div class="category-tabs" role="group" aria-label="Filter experiments">${categories.map(c => `<button class="category-tab ${category === c ? 'selected' : ''}" data-category="${c}" aria-pressed="${category === c}">${c}</button>`).join('')}</div><input type="search" id="experiment-search" placeholder="Find an experiment…" aria-label="Search experiments" value="${esc(query)}"></div><div id="experiment-grid" class="experiment-grid"></div></section>
-  <section class="home-note"><div class="home-note-icon">${icon('headphones')}</div><div><h3>A little setup goes a long way.</h3><p>Grab headphones, find a quiet spot, and start at a comfortable low volume. No microphone or account needed.</p></div><button class="text-button" data-action="setup">Check my setup ${icon('arrow')}</button></section>`;
+  const exploredLine = visited.size ? t('home.exploredCount', { n: visited.size }) : t('home.endlessQuestions');
+  main().innerHTML = `<section class="home-intro"><div><div class="eyebrow"><span></span> ${esc(t('home.eyebrow'))}</div><h1>${esc(t('home.heading1'))}<br>${esc(t('home.heading2'))}<span class="heading-dot">.</span></h1><p>${esc(t('home.intro1'))}<br class="desktop-break"> ${esc(t('home.intro2'))}</p></div><div class="intro-index"><span>11</span><div>${esc(t('home.experimentsCaps'))}<br>${esc(exploredLine)}</div></div></section>
+  <a href="#phase" class="feature-card"><div class="feature-copy"><span class="feature-label">${esc(t('home.featureLabel'))} <span dir="ltr">01 / 11</span></span><h2>${esc(t('home.featureTitle1'))}<br>${esc(t('home.featureTitle2'))}</h2><p>${esc(t('home.featureCopy1'))}<br>${esc(t('home.featureCopy2'))}</p><span class="feature-button">${esc(t('home.featureCta'))} ${icon('arrow')}</span><div class="feature-foot">${icon('headphones')} ${esc(t('home.featureFoot'))} <span>·</span> ${esc(t('home.featureTime'))}</div></div><div class="feature-visual"><div class="scope-labels"><span><i class="left-dot"></i> ${esc(t('home.scopeLeft'))}</span><span><i class="right-dot"></i> ${esc(t('home.scopeRight'))}</span><span><i class="sum-dot"></i> ${esc(t('home.scopeMono'))}</span></div>${heroScope()}<div class="scope-equation" dir="ltr"><span>+1</span><span>−1</span><span>= 0</span></div><div class="scope-caption">${esc(t('home.scopeCaption'))}</div></div></a>
+  <section class="catalog-section" aria-labelledby="catalog-title"><div class="section-heading"><h2 id="catalog-title">${esc(t('home.catalogTitle'))}<span id="catalog-count" class="count-pill">11</span></h2><span>${esc(t('home.catalogSub'))}</span></div><div class="catalog-tools"><div class="category-tabs" role="group" aria-label="${esc(t('home.filterAria'))}">${CATEGORY_IDS.map(id => `<button class="category-tab ${category === id ? 'selected' : ''}" data-category="${id}" aria-pressed="${category === id}">${esc(t(`categories.${id}`))}</button>`).join('')}</div><input type="search" id="experiment-search" placeholder="${esc(t('home.searchPlaceholder'))}" aria-label="${esc(t('home.searchAria'))}" value="${esc(query)}"></div><div id="experiment-grid" class="experiment-grid"></div></section>
+  <section class="home-note"><div class="home-note-icon">${icon('headphones')}</div><div><h3>${esc(t('home.setupTitle'))}</h3><p>${esc(t('home.setupBody'))}</p></div><button class="text-button" data-action="setup">${esc(t('home.setupCta'))} ${icon('arrow')}</button></section>`;
   renderCards();
 }
+
 function renderCards() {
-  const list = experiments.filter(e => (category === 'All experiments' || e.category === category) && `${e.title} ${e.short} ${e.description} ${e.category}`.toLowerCase().includes(query.toLowerCase()));
-  document.querySelector('#experiment-grid').innerHTML = list.length ? list.map(e => `<a href="#${e.id}" class="experiment-card ${e.color}"><div class="card-top"><span class="card-icon">${icon(e.icon)}</span><span class="card-number">${e.number} ${visited.has(e.id) ? '<span title="Explored">✓</span>' : ''}</span></div><div class="card-graphic">${cardVisual(e.id)}</div><div class="card-category">${e.category}</div><h3>${e.title}</h3><p>${e.short}</p><div class="card-bottom"><span>${e.time}${e.challenge ? ' · Challenge' : ' · Explore'}</span>${icon('arrow')}</div></a>`).join('') : `<div class="empty-search">No experiments match that search. Try “pitch”, “wave”, or “noise”.</div>`;
+  const q = query.trim().toLowerCase();
+  const list = experiments.map(localizedExperiment).filter(e => {
+    const raw = byId[e.id];
+    const catOk = category === 'all' || e.categoryId === category;
+    const queryOk = !q || `${e.title} ${e.short} ${e.description} ${e.categoryLabel} ${raw.title} ${raw.short} ${raw.description}`.toLowerCase().includes(q);
+    return catOk && queryOk;
+  });
+  const countPill = document.querySelector('#catalog-count');
+  if (countPill) countPill.textContent = String(list.length);
+  document.querySelector('#experiment-grid').innerHTML = list.length ? list.map(e => `<a href="#${e.id}" class="experiment-card ${e.color}"><div class="card-top"><span class="card-icon">${icon(e.icon)}</span><span class="card-number">${e.number} ${visited.has(e.id) ? `<span class="explored-mark" title="${esc(t('home.exploredTitle'))}">✓</span>` : ''}</span></div><div class="card-graphic">${cardVisual(e.id)}</div><div class="card-category">${esc(e.categoryLabel)}</div><h3>${esc(e.title)}</h3><p>${esc(e.short)}</p><div class="card-bottom"><span>${esc(e.time)} · ${esc(e.challenge ? t('home.cardChallenge') : t('home.cardExplore'))}</span>${icon('arrow')}</div></a>`).join('') : `<div class="empty-search"><p>${esc(t('home.emptySearch'))}</p><button class="outline-button" data-action="clear-filter">${esc(t('home.showAll'))}</button></div>`;
 }
 
 function renderExperimentPage() {
-  const e = byId[active];
-  main().innerHTML = `<section class="experiment-header"><a class="back-link" href="#explore">← All experiments</a><div class="experiment-heading-row"><div><div class="eyebrow"><span class="number-label">${e.number}</span> ${e.category.toUpperCase()} <span class="eyebrow-separator">/</span> ${e.time}</div><h1>${e.title}<span class="heading-dot">.</span></h1><p>${e.description}</p></div><span class="large-experiment-icon ${e.color}">${icon(e.icon)}</span></div></section>
-  <div class="experiment-layout"><div class="experiment-workbench"><div class="workbench-top"><span class="panel-label">${icon('waves')} THE WORKBENCH</span><div class="workbench-tools">${e.challenge ? `<div class="mode-tabs"><button data-mode="explore" class="${currentMode === 'explore' ? 'selected' : ''}">Explore</button><button data-mode="challenge" class="${currentMode === 'challenge' ? 'selected' : ''}">Challenge</button></div>` : ''}<button class="icon-button" data-action="reset" title="Reset experiment" aria-label="Reset experiment">${icon('reset')}</button><button class="icon-button" data-action="share" title="Copy experiment link" aria-label="Copy experiment link">${icon('share')}</button></div></div><div id="workbench-body"></div></div>
-  <aside class="experiment-guide"><div class="prediction"><span class="tiny-label">BEFORE YOU PRESS PLAY</span><h2>${e.question}</h2><p>Make a guess. Then press Play and let your ears decide.</p></div><section class="try-this"><span class="tiny-label">TRY THIS</span><ol>${e.steps.map(s => `<li>${s}</li>`).join('')}</ol></section><div class="discovery-fact">${icon('info')}<p>${e.fact}</p></div></aside></div>
-  <section class="understanding"><div class="explanation"><div class="eyebrow">THE PART BEHIND THE MAGIC</div><h2>What’s happening?</h2><p>${e.explanation}</p><details><summary>A little deeper ${icon('arrow')}</summary><p>${e.detail}</p><a href="${e.source}" target="_blank" rel="noopener noreferrer">${e.sourceLabel} ↗</a></details></div><div class="observation-card"><div class="observation-heading">${icon('book')}<h3>What did you notice?</h3></div><label class="sr-only" for="observation">Your observation</label><textarea id="observation" rows="3" maxlength="1500" placeholder="A prediction, a surprise, a question…"></textarea><div class="observation-footer"><span>Saved on this device.</span><div class="observation-actions">${dictation.supported ? `<button class="small-button dictate-button" id="dictate-button" data-action="dictate" aria-pressed="false" aria-describedby="dictation-note">${icon('mic')}<span>Dictate</span></button>` : ''}<button class="small-button" data-action="save-note">Save a note ${icon('arrow')}</button></div></div>${dictation.supported ? `<p class="dictation-note" id="dictation-note">Dictation uses your browser’s speech service, which may send your voice to the browser’s maker to turn it into text. Hearing Lab itself records nothing.</p>` : ''}</div></section>
-  <nav class="next-experiments" aria-label="More experiments"><span>KEEP FOLLOWING YOUR EARS</span>${[experiments[(experiments.indexOf(e) + 1) % experiments.length], experiments[(experiments.indexOf(e) + 2) % experiments.length]].map(n => `<a href="#${n.id}">${icon(n.icon)} ${n.title} ${icon('arrow')}</a>`).join('')}</nav>`;
+  const e = localizedExperiment(byId[active]);
+  const idx = experiments.findIndex(x => x.id === e.id);
+  const nextExps = [experiments[(idx + 1) % experiments.length], experiments[(idx + 2) % experiments.length]].map(localizedExperiment);
+  main().innerHTML = `<section class="experiment-header"><a class="back-link" href="#explore"><span class="dir-arrow" aria-hidden="true">←</span> ${esc(t('workbench.backAll'))}</a><div class="experiment-heading-row"><div><div class="eyebrow"><span class="number-label">${e.number}</span> ${esc(e.categoryLabel.toUpperCase())} <span class="eyebrow-separator">/</span> ${esc(e.time)}</div><h1>${esc(e.title)}<span class="heading-dot">.</span></h1><p>${esc(e.description)}</p></div><span class="large-experiment-icon ${e.color}">${icon(e.icon)}</span></div></section>
+  <div class="experiment-layout"><div class="experiment-workbench"><div class="workbench-top"><span class="panel-label">${icon('waves')} ${esc(t('workbench.title'))}</span><div class="workbench-tools">${e.challenge ? `<div class="mode-tabs" role="group" aria-label="${esc(t('workbench.modeAria'))}"><button data-mode="explore" aria-pressed="${currentMode === 'explore'}" class="${currentMode === 'explore' ? 'selected' : ''}">${icon('sliders')} ${esc(t('workbench.modeExplore'))}</button><button data-mode="challenge" aria-pressed="${currentMode === 'challenge'}" class="${currentMode === 'challenge' ? 'selected' : ''}">${icon('target')} ${esc(t('workbench.modeChallenge'))}</button></div>` : ''}<button class="icon-button" data-action="reset" title="${esc(t('workbench.resetTitle'))}" aria-label="${esc(t('workbench.resetAria'))}">${icon('reset')}</button><button class="icon-button" data-action="share" title="${esc(t('workbench.shareTitle'))}" aria-label="${esc(t('workbench.shareAria'))}">${icon('share')}</button></div></div><div id="workbench-body"></div></div>
+  <aside class="experiment-guide"><div class="prediction"><span class="tiny-label">${esc(t('workbench.beforePlay'))}</span><h2>${esc(e.question)}</h2><p>${esc(t('workbench.makeGuess'))}</p></div><section class="try-this"><span class="tiny-label">${esc(t('workbench.tryThis'))}</span><ol>${e.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol></section><div class="discovery-fact">${icon('info')}<p>${esc(e.fact)}</p></div></aside></div>
+  <section class="understanding"><div class="explanation"><div class="eyebrow">${esc(t('workbench.behindMagic'))}</div><h2>${esc(t('workbench.whatsHappening'))}</h2><p>${esc(e.explanation)}</p><details><summary>${esc(t('workbench.littleDeeper'))} ${icon('arrow')}</summary><p>${esc(e.detail)}</p><a href="${e.source}" target="_blank" rel="noopener noreferrer">${esc(e.sourceLabel)} <span dir="ltr">↗</span></a></details></div><div class="observation-card"><div class="observation-heading">${icon('book')}<h3>${esc(t('workbench.whatNoticed'))}</h3></div><label class="sr-only" for="observation">${esc(t('workbench.yourObservation'))}</label><textarea id="observation" rows="3" maxlength="1500" placeholder="${esc(t('workbench.obsPlaceholder'))}"></textarea><div class="observation-footer"><span>${esc(t('workbench.savedLocal'))}</span><div class="observation-actions">${dictation.supported ? `<button class="small-button dictate-button" id="dictate-button" data-action="dictate" aria-pressed="false" aria-describedby="dictation-note">${icon('mic')}<span>${esc(t('workbench.dictate'))}</span></button>` : ''}<button class="small-button" data-action="save-note">${esc(t('workbench.saveNote'))} ${icon('arrow')}</button></div></div>${dictation.supported ? `<p class="dictation-note" id="dictation-note">${esc(t('workbench.dictationNote'))}</p>` : ''}</div></section>
+  <nav class="next-experiments" aria-label="${esc(t('workbench.keepFollowing'))}"><span>${esc(t('workbench.keepFollowing'))}</span>${nextExps.map(n => `<a href="#${n.id}">${icon(n.icon)} ${esc(n.title)} ${icon('arrow')}</a>`).join('')}</nav>`;
   renderWorkbench();
 }
 
@@ -104,243 +171,645 @@ function renderWorkbench() {
   const body = document.querySelector('#workbench-body');
   if (currentMode === 'challenge') {
     body.innerHTML = '<div id="challenge-host"></div>';
-    cleanupChallenge = mountChallenge(document.querySelector('#challenge-host'), { kind: active, engine, onSave: result => {
-      try { saveNote({ experiment: active, title: `${byId[active].title} · challenge`, type: 'challenge', result, observation: 'A listening challenge, on this device and at this volume.', setup: setupSnapshot() }); updateCount(); toast('Challenge saved to your notebook.'); } catch { toast('This browser could not save the result. Check available storage.'); return false; }
-    } });
+    cleanupChallenge = mountChallenge(document.querySelector('#challenge-host'), {
+      kind: active,
+      engine,
+      onSave: result => {
+        try {
+          const e = localizedExperiment(byId[active]);
+          saveNote({
+            experiment: active,
+            title: `${e.title} · ${t('notebook.challengeTitleSuffix')}`,
+            type: 'challenge',
+            result,
+            observation: t('notebook.challengeObsDefault'),
+            setup: setupSnapshot(),
+          });
+          updateCount();
+          toast(t('toasts.challengeSaved'));
+        } catch {
+          toast(t('toasts.saveFailed'));
+          return false;
+        }
+      },
+    });
     return;
   }
-  body.innerHTML = `<div class="playback-row"><button class="primary-button listen-button" id="listen-button" data-action="listen" aria-pressed="false">${icon('play')}<span>Play</span></button><div><strong id="listen-description"></strong><span>It plays until you press Stop. Change anything while you listen.</span></div><span id="live-badge" class="live-badge" hidden><i></i>LIVE</span></div>
-  <figure class="picture-panel" id="picture-panel"><div class="picture-top"><span class="picture-label">THE IDEA IN A PICTURE</span><strong id="picture-title"></strong></div><div class="picture-scroll"><div id="picture"></div></div><span class="picture-swipe" aria-hidden="true">Swipe the picture sideways →</span><figcaption id="picture-caption"></figcaption></figure>
+  const defaultSpectrum = ['noise', 'harmonics', 'amplitude'].includes(active);
+  const showSpectrum = defaultSpectrum || forceSpectrum;
+  const playHintHtml = esc(t('workbench.playHint', { space: '__SPACE_KBD__' })).replace('__SPACE_KBD__', '<kbd>space</kbd>');
+  body.innerHTML = `<div class="playback-row"><button class="primary-button listen-button" id="listen-button" data-action="listen" aria-pressed="false">${icon('play')}<span>${esc(t('workbench.play'))}</span></button><div><strong id="listen-description"></strong><span>${playHintHtml}</span></div><span id="live-badge" class="live-badge" hidden><i></i>${esc(t('workbench.live'))}</span></div>
+  <figure class="picture-panel" id="picture-panel"><div class="picture-top"><div class="picture-heading"><span class="picture-label">${esc(t('workbench.ideaLabel'))}</span><strong id="picture-title"></strong></div><span id="picture-hint" class="picture-hint"></span></div><div class="picture-scroll"><div id="picture"></div></div><span class="picture-swipe" aria-hidden="true">${esc(t('workbench.swipeHint'))}</span><figcaption id="picture-caption"></figcaption></figure>
   <div class="experiment-controls" id="experiment-controls"></div>
-  <div class="scope-panel"><div class="scope-top"><div class="scope-legend"><span><i class="left-dot"></i>Left</span><span><i class="right-dot"></i>Right</span><span><i class="sum-dot"></i>Mono average</span></div><span class="scope-live-label">THE SIGNAL ITSELF</span></div><div id="signal-visual"></div><div class="scope-bottom"><span id="scope-context"></span><span>Fixed visual scale · digital signal</span></div></div>`;
-  renderControls(); updateVisual();
+  <div class="scope-panel"><div class="scope-top"><div class="scope-legend"><span><i class="left-dot"></i>${esc(t('workbench.left'))}</span><span><i class="right-dot"></i>${esc(t('workbench.right'))}</span><span><i class="sum-dot"></i>${esc(t('workbench.monoAvg'))}</span></div><div class="scope-actions">${defaultSpectrum ? '' : `<button class="scope-toggle ${showSpectrum ? 'active' : ''}" data-action="toggle-spectrum" aria-pressed="${showSpectrum}">${icon('bars')} ${esc(t('workbench.spectrumBtn'))}</button>`}<span class="scope-live-label">${esc(t('workbench.signalLabel'))}</span></div></div><div id="signal-visual"></div><div class="scope-bottom"><span id="scope-context"></span><span>${esc(t('workbench.fixedScale'))}</span></div></div>`;
+  renderControls();
+  updateVisual();
 }
 
 function formatValue(key, v) {
-  if (['frequency','fundamental'].includes(key)) return Number(v) >= 1000 ? `${Number((Number(v) / 1000).toFixed(2))} kHz` : `${Math.round(v)} Hz`;
+  if (['frequency', 'fundamental'].includes(key)) return Number(v) >= 1000 ? `${Number((Number(v) / 1000).toFixed(2))} kHz` : `${Math.round(v)} Hz`;
   if (key === 'phase') return `${Math.round(v)}°`;
   if (key === 'difference') return `${Number(Number(v).toFixed(1))} Hz`;
-  if (['delayMs','gapMs'].includes(key)) return `${Number(Number(v).toFixed(2))} ms`;
-  if (['snr','gainDb'].includes(key)) return `${Number(v) > 0 ? '+' : ''}${Math.round(v)} dB`;
-  if (key === 'pan') return Math.abs(v) < .005 ? 'Centered' : `${Math.round(Math.abs(v) * 100)}% ${v < 0 ? 'left' : 'right'}`;
+  if (['delayMs', 'gapMs'].includes(key)) return `${Number(Number(v).toFixed(2))} ms`;
+  if (['snr', 'gainDb'].includes(key)) return `${Number(v) > 0 ? '+' : ''}${Math.round(v)} dB`;
+  if (key === 'pan') {
+    if (Math.abs(v) < .005) return t('controls.centered');
+    const pct = Math.round(Math.abs(v) * 100);
+    return v < 0 ? t('controls.pctLeft', { n: pct }) : t('controls.pctRight', { n: pct });
+  }
   return String(v);
 }
+
+function rangeProgress(value, min, max, log) {
+  const lo = log ? Math.log2(min) : min;
+  const hi = log ? Math.log2(max) : max;
+  const cur = log ? Math.log2(Math.max(min, value)) : value;
+  return Math.min(100, Math.max(0, ((cur - lo) / Math.max(1e-6, hi - lo)) * 100)).toFixed(1);
+}
+
 function range(key, label, min, max, step = 1, log = false, hint = '') {
   const value = settings[active][key];
-  return `<div class="control-group"><label for="control-${key}">${label}<output id="output-${key}">${formatValue(key, value)}</output></label><input type="range" id="control-${key}" data-param="${key}" ${log ? 'data-log="true"' : ''} min="${log ? Math.log2(min) : min}" max="${log ? Math.log2(max) : max}" step="${log ? '.005' : step}" value="${log ? Math.log2(value) : value}" aria-valuetext="${formatValue(key, value)}"><div class="range-endpoints"><span>${formatValue(key, min)}</span><span>${hint}</span><span>${formatValue(key, max)}</span></div></div>`;
+  const pct = rangeProgress(value, min, max, log);
+  const formatted = formatValue(key, value);
+  return `<div class="control-group"><label for="control-${key}">${esc(label)}<output id="output-${key}" dir="auto">${esc(formatted)}</output></label><input type="range" id="control-${key}" data-param="${key}" ${log ? 'data-log="true"' : ''} min="${log ? Math.log2(min) : min}" max="${log ? Math.log2(max) : max}" step="${log ? '.005' : step}" value="${log ? Math.log2(value) : value}" style="--progress:${pct}%" aria-valuetext="${esc(formatted)}" title="${esc(t('workbench.doubleClickReset'))}"><div class="range-endpoints"><span>${esc(formatValue(key, min))}</span><span>${esc(hint)}</span><span>${esc(formatValue(key, max))}</span></div></div>`;
 }
+
 function segments(key, label, choices) {
-  return `<fieldset class="control-group"><legend>${label}</legend><div class="segmented-control">${choices.map(([value, text]) => `<button data-param-button="${key}" data-value="${value}" aria-pressed="${String(settings[active][key]) === String(value)}" class="${String(settings[active][key]) === String(value) ? 'selected' : ''}">${text}</button>`).join('')}</div></fieldset>`;
+  return `<fieldset class="control-group"><legend>${esc(label)}</legend><div class="segmented-control">${choices.map(([value, text]) => `<button data-param-button="${key}" data-value="${value}" aria-pressed="${String(settings[active][key]) === String(value)}" class="${String(settings[active][key]) === String(value) ? 'selected' : ''}">${esc(text)}</button>`).join('')}</div></fieldset>`;
 }
+
 function renderControls() {
-  const p = settings[active]; let html = '';
+  const p = settings[active];
+  let html = '';
   if (active === 'phase') {
-    html = `<div class="preset-row"><span>QUICK DISCOVERIES</span><button data-preset="same">Aligned waves</button><button data-preset="opposite">Opposite ears</button><button data-preset="cancel">Make silence</button></div>`;
-    html += segments('source','Sound source',[['sine','Sine wave'],['complex','Complex tone'],['noise','Noise']]);
-    html += `<div class="two-controls">${segments('mode','What changes?',[...(p.source === 'sine' ? [['phase','Phase']] : []),['polarity','Polarity'],['delay','Delay']])}${segments('routing','Where does it go?',[['stereo','Separate ears'],['mono','Mix to mono']])}</div>`;
-    if (p.source !== 'noise') html += range('frequency','Frequency',125,2000,1,true);
-    if (p.mode === 'phase') html += range('phase','Relative phase',0,360,1,false,'One complete cycle');
-    else if (p.mode === 'polarity') html += segments('phase','Right-channel polarity',[[0,'Matching'],[180,'Upside down']]);
-    else html += range('delayMs','Right-channel delay',0,2,.05);
+    html = `<div class="preset-row"><span>${esc(t('controls.quickDiscoveries'))}</span><button data-preset="same">${esc(t('controls.presetAligned'))}</button><button data-preset="opposite">${esc(t('controls.presetOpposite'))}</button><button data-preset="cancel">${esc(t('controls.presetCancel'))}</button></div>`;
+    html += segments('source', t('controls.soundSource'), [['sine', t('controls.sineWave')], ['complex', t('controls.complexTone')], ['noise', t('controls.noise')]]);
+    html += `<div class="two-controls">${segments('mode', t('controls.whatChanges'), [...(p.source === 'sine' ? [['phase', t('controls.phase')]] : []), ['polarity', t('controls.polarity')], ['delay', t('controls.delay')]])}${segments('routing', t('controls.whereGoes'), [['stereo', t('controls.separateEars')], ['mono', t('controls.mixMono')]])}</div>`;
+    if (p.source !== 'noise') html += range('frequency', t('controls.frequency'), 125, 2000, 1, true);
+    if (p.mode === 'phase') html += range('phase', t('controls.relativePhase'), 0, 360, 1, false, t('controls.oneCycle'));
+    else if (p.mode === 'polarity') html += segments('phase', t('controls.rightPolarity'), [[0, t('controls.matching')], [180, t('controls.upsideDown')]]);
+    else html += range('delayMs', t('controls.rightDelay'), 0, 2, .05);
   } else if (active === 'beats') {
-    html = range('frequency','First tone',100,800,1,true) + range('difference','Frequency spacing',.5,20,.5,false,'This sets the beat rate') + segments('routing','Listen to the tones',[['together','Mixed together'],['separate','One in each ear']]);
+    html = range('frequency', t('controls.firstTone'), 100, 800, 1, true)
+      + range('difference', t('controls.freqSpacing'), .5, 20, .5, false, t('controls.setsBeatRate'))
+      + segments('routing', t('controls.listenTones'), [['together', t('controls.mixedTogether')], ['separate', t('controls.oneEachEar')]]);
   } else if (active === 'harmonics') {
-    html = `<div class="preset-row"><span>QUICK DISCOVERIES</span><button data-preset="full">All harmonics</button><button data-preset="missing">Missing fundamental</button><button data-preset="pure">Pure tone</button></div>` + range('fundamental','Fundamental frequency',100,500,1,true);
-    html += `<div class="harmonic-bank">${p.harmonics.map((v,i) => `<div class="harmonic-control"><output>${Math.round(v * 100)}%</output><input type="range" data-harmonic="${i}" aria-label="Harmonic ${i+1}, ${(i+1)*p.fundamental} hertz" min="0" max="1" step=".01" value="${v}"><strong>${i === 0 ? 'F₀' : `${i+1}×`}</strong><span>${Math.round((i+1)*p.fundamental)} Hz</span></div>`).join('')}</div><p class="control-hint">Each fader adds one pure tone. Zero removes it from the generated sound.</p>`;
+    html = `<div class="preset-row"><span>${esc(t('controls.quickDiscoveries'))}</span><button data-preset="full">${esc(t('controls.presetFullHarmonics'))}</button><button data-preset="missing">${esc(t('controls.presetMissingFund'))}</button><button data-preset="pure">${esc(t('controls.presetPureTone'))}</button></div>`
+      + range('fundamental', t('controls.fundamentalFreq'), 100, 500, 1, true);
+    html += `<div class="harmonic-bank">${p.harmonics.map((v, i) => `<div class="harmonic-control" style="--h-level:${Math.round(v * 100)}%"><output dir="ltr">${Math.round(v * 100)}%</output><div class="harmonic-fader-wrap"><div class="harmonic-bar-fill" aria-hidden="true"></div><input type="range" data-harmonic="${i}" aria-label="${esc(t('controls.harmonicAria', { n: i + 1, hz: Math.round((i + 1) * p.fundamental) }))}" min="0" max="1" step=".01" value="${v}" title="${esc(t('workbench.doubleClickReset'))}"></div><button type="button" class="harmonic-label-btn" data-toggle-harmonic="${i}" title="${esc(t('controls.toggleHarmonic', { n: i + 1 }))}"><strong dir="ltr">${i === 0 ? 'F₀' : `${i + 1}×`}</strong><span dir="ltr">${Math.round((i + 1) * p.fundamental)} Hz</span></button></div>`).join('')}</div><p class="control-hint">${esc(t('controls.harmonicHint'))}</p>`;
   } else if (active === 'amplitude') {
-    html = segments('shape','Wave shape',[['sine','Sine'],['triangle','Triangle'],['square','Square'],['sawtooth','Sawtooth']]) + range('frequency','Frequency',100,1000,1,true) + range('gainDb','Relative gain',-30,0,1,false,'A signal ratio, not acoustic dB');
+    html = segments('shape', t('controls.waveShape'), [['sine', t('controls.sine')], ['triangle', t('controls.triangle')], ['square', t('controls.square')], ['sawtooth', t('controls.sawtooth')]])
+      + range('frequency', t('controls.frequency'), 100, 1000, 1, true)
+      + range('gainDb', t('controls.relativeGain'), -30, 0, 1, false, t('controls.signalRatioHint'));
   } else if (active === 'spatial') {
-    html = segments('source','Sound source',[['noise','Broadband noise'],['sine','Pure tone']]) + range('pan','Left / right balance',-1,1,.01) + range('delayMs','Waveform delay',-1,1,.025,false,'Positive = right waveform lags');
-    if(p.source === 'sine') html += range('frequency','Tone frequency',125,1500,1,true);
+    html = segments('source', t('controls.soundSource'), [['noise', t('controls.broadbandNoise')], ['sine', t('controls.pureTone')]])
+      + range('pan', t('controls.lrBalance'), -1, 1, .01)
+      + range('delayMs', t('controls.waveDelay'), -1, 1, .025, false, t('controls.rightLagsHint'));
+    if (p.source === 'sine') html += range('frequency', t('controls.toneFreq'), 125, 1500, 1, true);
   } else if (active === 'masking') {
-    html = segments('invertTone','The tone in your ears',[[false,'Matching tones'],[true,'Opposite tone']]) + range('snr','Tone relative to noise',-30,0,1,false,'Lower = harder to find') + segments('routing','Output',[['stereo','Separate ears'],['mono','Mix to mono']]) + `<p class="control-hint">The tone pulses on and off, twice a second. The same noise stays in both ears; only the tone flips.</p>`;
+    html = segments('invertTone', t('controls.toneInEars'), [[false, t('controls.matchingTones')], [true, t('controls.oppositeTone')]])
+      + range('snr', t('controls.toneRelNoise'), -30, 0, 1, false, t('controls.lowerHarderHint'))
+      + segments('routing', t('controls.output'), [['stereo', t('controls.separateEars')], ['mono', t('controls.mixMono')]])
+      + `<p class="control-hint">${esc(t('controls.maskingHint'))}</p>`;
   } else if (active === 'noise') {
-    html = segments('color','Choose a spectrum',[['white','White'],['pink','Pink'],['brown','Brown']]) + `<p class="control-hint">Switch colors while the noise plays. The change is easiest to hear at the moment you switch.</p>`;
+    html = segments('color', t('controls.chooseSpectrum'), [['white', t('controls.white')], ['pink', t('controls.pink')], ['brown', t('controls.brown')]])
+      + `<p class="control-hint">${esc(t('controls.noiseHint'))}</p>`;
   } else if (active === 'shepard') {
-    html = segments('direction','Choose a direction',[['up','Always ascending'],['down','Always descending']]) + `<p class="control-hint">Let it run. After 12 steps it is back where it began, yet it never seems to drop. Flip the direction mid-climb.</p>`;
+    html = segments('direction', t('controls.chooseDirection'), [['up', t('controls.alwaysAscending')], ['down', t('controls.alwaysDescending')]])
+      + `<p class="control-hint">${esc(t('controls.shepardHint'))}</p>`;
   } else if (active === 'frequency') {
-    html = range('frequency','Tone frequency',80,Math.min(18000, .45 * (engine.sampleRate || 48000)),1,true) + `<div class="frequency-presets">${[125,250,500,1000,2000,4000,8000,12000,16000].map(f => `<button data-frequency="${f}" class="${Math.abs(p.frequency-f)<1?'selected':''}">${f < 1000 ? f : `${f/1000}k`}</button>`).join('')}</div>` + segments('ear','Listen with',[['both','Both ears'],['left','Left only'],['right','Right only']]) + `<p class="control-hint">Sweep the slider while the tone plays. Keep one comfortable volume: if a tone disappears, let it disappear. Do not turn it up to chase it.</p>`;
-  } else if (active === 'pitch') html = range('frequency','Try a pitch',100,4000,1,true) + `<p class="control-hint">Slide slowly while the tone plays, then switch to the challenge to compare two pitches.</p>`;
-  else if (active === 'gap') html = range('gapMs','Silent plateau',1,64,1,false,'Short smooth edges surround the gap') + `<p class="control-hint">The noise is interrupted every two thirds of a second. Shrink the gap until the stutter melts away, then try the challenge.</p>`;
+    html = range('frequency', t('controls.toneFreq'), 80, Math.min(18000, .45 * (engine.sampleRate || 48000)), 1, true)
+      + `<div class="frequency-presets" dir="ltr">${[125, 250, 500, 1000, 2000, 4000, 8000, 12000, 16000].map(f => `<button data-frequency="${f}" class="${Math.abs(p.frequency - f) < 1 ? 'selected' : ''}">${f < 1000 ? f : `${f / 1000}k`}</button>`).join('')}</div>`
+      + segments('ear', t('controls.listenWith'), [['both', t('controls.bothEars')], ['left', t('controls.leftOnly')], ['right', t('controls.rightOnly')]])
+      + `<p class="control-hint">${esc(t('controls.frequencyHint'))}</p>`;
+  } else if (active === 'pitch') {
+    html = range('frequency', t('controls.tryPitch'), 100, 4000, 1, true)
+      + `<p class="control-hint">${esc(t('controls.pitchHint'))}</p>`;
+  } else if (active === 'gap') {
+    html = range('gapMs', t('controls.silentPlateau'), 1, 64, 1, false, t('controls.gapEdgesHint'))
+      + `<p class="control-hint">${esc(t('controls.gapHint'))}</p>`;
+  }
   // Rebuilding the controls must not throw away keyboard focus.
   const focused = document.activeElement?.closest?.('#experiment-controls') ? document.activeElement : null;
-  const focusKey = focused && (focused.id ? `#${focused.id}` : focused.dataset.paramButton ? `[data-param-button="${focused.dataset.paramButton}"][data-value="${focused.dataset.value}"]` : focused.dataset.preset ? `[data-preset="${focused.dataset.preset}"]` : focused.dataset.frequency ? `[data-frequency="${focused.dataset.frequency}"]` : focused.dataset.harmonic !== undefined ? `[data-harmonic="${focused.dataset.harmonic}"]` : null);
+  const focusKey = focused && (focused.id ? `#${focused.id}` : focused.dataset.paramButton ? `[data-param-button="${focused.dataset.paramButton}"][data-value="${focused.dataset.value}"]` : focused.dataset.preset ? `[data-preset="${focused.dataset.preset}"]` : focused.dataset.frequency ? `[data-frequency="${focused.dataset.frequency}"]` : focused.dataset.harmonic !== undefined ? `[data-harmonic="${focused.dataset.harmonic}"]` : focused.dataset.toggleHarmonic !== undefined ? `[data-toggle-harmonic="${focused.dataset.toggleHarmonic}"]` : null);
   const controls = document.querySelector('#experiment-controls');
   controls.innerHTML = html;
   if (focusKey) controls.querySelector(focusKey)?.focus({ preventScroll: true });
 }
+
 const LISTEN_TEXT = {
-  phase: p => p.routing === 'mono' ? 'Two waves, added before they reach you.' : 'One wave for each ear.',
-  beats: p => `${p.frequency} Hz and ${Number(p.frequency) + Number(p.difference)} Hz, ${p.routing === 'separate' ? 'one in each ear' : 'mixed together'}.`,
-  harmonics: () => 'Up to six pure tones, stacked.',
-  amplitude: p => `A steady ${p.shape} wave.`,
-  spatial: p => p.source === 'sine' ? 'A steady tone in both ears.' : 'Steady noise in both ears.',
-  masking: () => 'A pulsing tone, hidden in steady noise.',
-  noise: p => `Steady ${p.color} noise.`,
-  shepard: p => `A staircase that keeps ${p.direction === 'down' ? 'descending' : 'climbing'}.`,
-  frequency: () => 'A steady pure tone.', pitch: () => 'A steady pure tone.',
-  gap: () => 'Noise with a repeating gap.',
+  phase: p => p.routing === 'mono' ? t('controls.listenPhaseMono') : t('controls.listenPhaseStereo'),
+  beats: p => {
+    const f1 = p.frequency, f2 = Number(p.frequency) + Number(p.difference);
+    return p.routing === 'separate' ? t('controls.listenBeatsSeparate', { f1, f2 }) : t('controls.listenBeatsTogether', { f1, f2 });
+  },
+  harmonics: () => t('controls.listenHarmonics'),
+  amplitude: p => t('controls.listenAmplitude', { shape: getLanguage() === 'de' ? t(`controls.${p.shape}`) : t(`controls.${p.shape}`).toLowerCase() }),
+  spatial: p => p.source === 'sine' ? t('controls.listenSpatialSine') : t('controls.listenSpatialNoise'),
+  masking: () => t('controls.listenMasking'),
+  noise: p => t('controls.listenNoise', { color: getLanguage() === 'de' ? t(`controls.${p.color}`) : t(`controls.${p.color}`).toLowerCase() }),
+  shepard: p => p.direction === 'down' ? t('controls.listenShepardDown') : t('controls.listenShepardUp'),
+  frequency: () => t('controls.listenPureTone'),
+  pitch: () => t('controls.listenPureTone'),
+  gap: () => t('controls.listenGap'),
 };
+
 function updatePicture() {
-  const host = document.querySelector('#picture'); if (!host || !byId[active]) return;
+  const host = document.querySelector('#picture');
+  if (!host || !byId[active]) return;
   const live = engine.live ? engine.liveInfo : null;
   shownPitchClass = live?.pitchClass ?? 0;
   const drawn = picture(active, settings[active], live);
   host.innerHTML = drawn.svg;
   document.querySelector('#picture-title').textContent = drawn.title;
   document.querySelector('#picture-caption').textContent = drawn.caption;
+  const hintEl = document.querySelector('#picture-hint');
+  if (hintEl) hintEl.textContent = drawn.hint || '';
 }
+
 function updateVisual() {
   if (!byId[active] || currentMode !== 'explore' || !document.querySelector('#signal-visual')) return;
   try {
-    const beforeRouting = ['phase','masking'].includes(active);
-    const fullClip = ['beats','gap','shepard','masking'].includes(active);
+    const beforeRouting = ['phase', 'masking'].includes(active);
+    const fullClip = ['beats', 'gap', 'shepard', 'masking'].includes(active);
     // The scope needs the whole clip only where it draws an envelope; elsewhere half a second is plenty.
-    const visualParams = {...settings[active], ...(beforeRouting ? {routing:'stereo'} : {}), ...(fullClip ? {} : {duration:.5})};
-    const rendered = renderExperiment(active,visualParams,engine.sampleRate || 48000,12345);
-    document.querySelector('#signal-visual').innerHTML = signalScope(rendered,active,settings[active]) + (['noise','harmonics','amplitude'].includes(active) ? spectrumView(rendered) : '');
-    document.querySelector('#scope-context').textContent = beforeRouting ? 'Before output routing · L, R, (L + R) ÷ 2' : active === 'beats' ? `${rendered.duration.toFixed(0)} seconds · peak envelopes` : fullClip ? `One ${rendered.duration.toFixed(1)}-second loop · peak envelopes` : 'Waveform excerpt · time →';
+    const visualParams = { ...settings[active], ...(beforeRouting ? { routing: 'stereo' } : {}), ...(fullClip ? {} : { duration: .5 }) };
+    const rendered = renderExperiment(active, visualParams, engine.sampleRate || 48000, 12345);
+    const showSpectrum = ['noise', 'harmonics', 'amplitude'].includes(active) || forceSpectrum;
+    document.querySelector('#signal-visual').innerHTML = signalScope(rendered, active, settings[active]) + (showSpectrum ? spectrumView(rendered) : '');
+    document.querySelector('#scope-context').textContent = beforeRouting
+      ? t('workbench.scopeBeforeRouting')
+      : active === 'beats'
+        ? t('workbench.scopeSecondsEnv', { n: rendered.duration.toFixed(0) })
+        : fullClip
+          ? t('workbench.scopeLoopEnv', { n: rendered.duration.toFixed(1) })
+          : t('workbench.scopeExcerpt');
     document.querySelector('#listen-description').textContent = LISTEN_TEXT[active](settings[active]);
     updatePicture();
-  } catch(error) { console.error(error); toast('That combination could not be rendered. Reset this experiment.'); }
+  } catch (error) {
+    console.error(error);
+    toast(t('toasts.renderError'));
+  }
 }
+
 /** Push the current settings to the sound that is already playing, and redraw. */
 function settingsChanged() {
   engine.updateLive(active, settings[active]);
-  cancelAnimationFrame(previewFrame); previewFrame = requestAnimationFrame(updateVisual);
+  cancelAnimationFrame(previewFrame);
+  previewFrame = requestAnimationFrame(updateVisual);
 }
+
+function syncControlInput(key, value) {
+  const input = document.querySelector(`#control-${key}`);
+  const output = document.querySelector(`#output-${key}`);
+  if (output) output.textContent = formatValue(key, value);
+  if (input) {
+    const log = Boolean(input.dataset.log);
+    const rawVal = log ? Math.log2(Math.max(1, value)) : value;
+    input.value = String(rawVal);
+    const min = Number(input.min), max = Number(input.max);
+    const pct = Math.min(100, Math.max(0, ((rawVal - min) / Math.max(1e-6, max - min)) * 100)).toFixed(1);
+    input.style.setProperty('--progress', `${pct}%`);
+    input.setAttribute('aria-valuetext', formatValue(key, value));
+  }
+  if (active === 'frequency' && key === 'frequency') {
+    document.querySelectorAll('.frequency-presets button').forEach(b => b.classList.toggle('selected', Math.abs(value - Number(b.dataset.frequency)) < 1));
+  }
+}
+
 function changeParameter(key, value, rebuild = false) {
   settings[active][key] = value;
-  if (active === 'phase' && key === 'source' && value !== 'sine' && settings.phase.mode === 'phase') { settings.phase.mode = 'polarity'; settings.phase.phase = settings.phase.phase >= 90 && settings.phase.phase < 270 ? 180 : 0; }
-  if (active === 'phase' && key === 'mode' && value === 'polarity' && ![0,180].includes(Number(settings.phase.phase))) settings.phase.phase = 180;
-  if(rebuild) renderControls();
+  if (active === 'phase' && key === 'source' && value !== 'sine' && settings.phase.mode === 'phase') {
+    settings.phase.mode = 'polarity';
+    settings.phase.phase = settings.phase.phase >= 90 && settings.phase.phase < 270 ? 180 : 0;
+  }
+  if (active === 'phase' && key === 'mode' && value === 'polarity' && ![0, 180].includes(Number(settings.phase.phase))) settings.phase.phase = 180;
+  if (rebuild) renderControls();
+  else syncControlInput(key, value);
   settingsChanged();
 }
 
-function setupSnapshot() { return { labVolume: engine.volume, sampleRate: engine.sampleRate || null, headphonesConfirmed: !!prefs.setup, calibrated: false }; }
+function setupSnapshot() {
+  return { labVolume: engine.volume, sampleRate: engine.sampleRate || null, headphonesConfirmed: !!prefs.setup, calibrated: false };
+}
+
+function formatNoteSummary(n) {
+  if (n.type === 'challenge' && n.result) {
+    const r = n.result;
+    const chips = [];
+    if (r.kind === 'pitch' && r.metrics?.cents != null) chips.push(`${Number(r.metrics.cents.toFixed(1))} ${t('challenges.centsApart')} (${Number(r.metrics.differenceHz.toFixed(1))} Hz)`);
+    if (r.kind === 'gap' && r.metrics?.gapMs != null) chips.push(t('notebook.chipGap', { ms: Number(r.metrics.gapMs.toFixed(1)) }));
+    if (Array.isArray(r.trials) && r.trials.length) chips.push(t('notebook.chipRounds', { n: r.trials.length }));
+    if (Array.isArray(r.reversals) && r.reversals.length) chips.push(t('notebook.chipReversals', { n: r.reversals.length }));
+    const chart = r.kind === 'frequency' && Array.isArray(r.metrics?.points)
+      ? frequencyMapChart(r.metrics.points)
+      : (r.kind === 'pitch' || r.kind === 'gap') && Array.isArray(r.trials)
+        ? staircaseChart(r.trials, r.reversals, r.kind)
+        : '';
+    return `${chips.length ? `<div class="note-chips">${chips.map(c => `<span class="note-chip">${esc(c)}</span>`).join('')}</div>` : ''}${chart}`;
+  }
+  if (n.params && typeof n.params === 'object') {
+    const labels = {
+      frequency: t('controls.frequency'),
+      fundamental: t('controls.fundamentalFreq'),
+      phase: t('controls.phase'),
+      difference: t('controls.freqSpacing'),
+      delayMs: t('controls.delay'),
+      gapMs: t('controls.silentPlateau'),
+      snr: t('controls.toneRelNoise'),
+      gainDb: t('controls.relativeGain'),
+      pan: t('controls.lrBalance'),
+      routing: t('controls.output'),
+      source: t('controls.soundSource'),
+      shape: t('controls.waveShape'),
+      color: t('controls.chooseSpectrum'),
+      direction: t('controls.chooseDirection'),
+      ear: t('controls.listenWith'),
+    };
+    const chips = Object.entries(n.params)
+      .filter(([k]) => !['duration', 'steps'].includes(k))
+      .map(([k, v]) => {
+        if (k === 'harmonics' && Array.isArray(v)) return `${t('notebook.chipHarmonics')}: ${v.map(x => `${Math.round(x * 100)}%`).join(' / ')}`;
+        if (k === 'invertTone') return v ? t('controls.oppositeTone') : t('controls.matchingTones');
+        return `${labels[k] || k}: ${formatValue(k, v)}`;
+      });
+    return chips.length ? `<div class="note-chips">${chips.map(c => `<span class="note-chip">${esc(c)}</span>`).join('')}</div>` : '';
+  }
+  return '';
+}
+
 function renderNotebook() {
   const notes = readNotes();
-  main().innerHTML = `<section class="simple-header"><div class="eyebrow">YOUR OWN LITTLE FIELD GUIDE</div><div class="title-and-action"><h1>Notebook<span class="heading-dot">.</span></h1><button class="outline-button" data-action="export" ${notes.length?'':'disabled'}>${icon('download')} Export JSON</button></div><p>What you heard. What you wondered. Stored in this browser, under your control.</p></section>${notes.length ? `<div class="notebook-grid">${notes.map(n => `<article class="notebook-card"><div class="note-top"><span>${byId[n.experiment]?.number || '—'} / ${esc(byId[n.experiment]?.title || 'Listening note')}</span><button class="icon-button" data-delete-note="${esc(n.id)}" aria-label="Delete this note">${icon('close')}</button></div><h2>${esc(n.title || 'A small discovery')}</h2><p class="note-text">${esc(n.observation || '')}</p>${n.type === 'challenge' ? `<span class="note-badge">Challenge result · ${esc(n.result?.status || 'saved')}</span>` : ''}<details><summary>Experiment settings</summary><pre>${esc(JSON.stringify(n.type === 'challenge' ? n.result : n.params,null,2))}</pre></details><footer><time datetime="${esc(n.createdAt)}">${new Date(n.createdAt).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})}</time><a href="#${esc(n.experiment)}">Try again ${icon('arrow')}</a></footer></article>`).join('')}</div>` : `<div class="empty-notebook"><div>${icon('book')}</div><h2>Every good experiment<br>starts with a question.</h2><p>Save observations from any experiment.<br>Your discoveries will collect here.</p><a class="primary-button" href="#explore">Find an experiment ${icon('arrow')}</a></div>`}<div class="notebook-privacy">${icon('info')}<p>No account, cloud sync, or analytics. Clearing this browser’s site data clears these notes, so export anything you want to keep. Up to 300 recent entries are retained.</p></div>`;
+  main().innerHTML = `<section class="simple-header"><div class="eyebrow">${esc(t('notebook.eyebrow'))}</div><div class="title-and-action"><h1>${esc(t('notebook.title'))}<span class="heading-dot">.</span></h1><button class="outline-button" data-action="export" ${notes.length ? '' : 'disabled'}>${icon('download')} ${esc(t('notebook.exportJson'))}</button></div><p>${esc(t('notebook.subtitle'))}</p></section>${notes.length ? `<div class="notebook-grid">${notes.map(n => {
+    const exp = byId[n.experiment] ? localizedExperiment(byId[n.experiment]) : null;
+    const tryHref = n.params && n.type !== 'challenge'
+      ? `#${esc(n.experiment)}?${new URLSearchParams({ s: JSON.stringify(n.params), mode: 'explore' })}`
+      : `#${esc(n.experiment)}`;
+    return `<article class="notebook-card"><div class="note-top"><span>${exp?.number || '—'} / ${esc(exp?.title || t('notebook.listeningNote'))}</span><button class="icon-button" data-delete-note="${esc(n.id)}" aria-label="${esc(t('notebook.deleteAria'))}">${icon('close')}</button></div><h2>${esc(n.title || t('notebook.smallDiscovery'))}</h2><p class="note-text">${esc(n.observation || '')}</p>${n.type === 'challenge' ? `<span class="note-badge">${esc(t('notebook.challengeBadge', { status: n.result?.status || 'saved' }))}</span>` : ''}${formatNoteSummary(n)}<details><summary>${esc(t('notebook.settingsSummary'))}</summary><pre dir="ltr">${esc(JSON.stringify(n.type === 'challenge' ? n.result : n.params, null, 2))}</pre></details><footer><time datetime="${esc(n.createdAt)}">${esc(new Date(n.createdAt).toLocaleDateString(getLanguage(), { day: 'numeric', month: 'short', year: 'numeric' }))}</time><a href="${tryHref}">${esc(t('notebook.tryAgain'))} ${icon('arrow')}</a></footer></article>`;
+  }).join('')}</div>` : `<div class="empty-notebook"><div>${icon('book')}</div><h2>${esc(t('notebook.emptyTitle1'))}<br>${esc(t('notebook.emptyTitle2'))}</h2><p>${esc(t('notebook.emptyBody1'))}<br>${esc(t('notebook.emptyBody2'))}</p><a class="primary-button" href="#explore">${esc(t('notebook.emptyCta'))} ${icon('arrow')}</a></div>`}<div class="notebook-privacy">${icon('info')}<p>${esc(t('notebook.privacy'))}</p></div>`;
 }
+
 function renderAbout() {
-  main().innerHTML = `<section class="simple-header"><div class="eyebrow">OPEN SOURCE. OPEN EARS.</div><h1>A lab for the curious<span class="heading-dot">.</span></h1><p>No special knowledge required. Just a pair of ears and a willingness to be surprised.</p></section><div class="about-grid"><article><h2>What this is</h2><p>Hearing Lab is a collection of small experiments in sound and perception. The controls are real and act on the sound while it plays, the sounds are generated in your browser, and each experiment has a picture that moves with the controls to show what the signal is doing.</p><p>It is built for people of every age. Try it alone, explore it with someone else, or use it to start a conversation in a classroom.</p><h2>Experiment, observe, question</h2><p>Make a prediction before you listen. Change one thing at a time. Repeat anything surprising. If someone hears something different, that is another observation worth exploring.</p><h2>About the listening challenges</h2><p>These are informal listening tasks, with no acoustic calibration. Your headphones, volume, room, and attention all affect the results. The lab does not diagnose hearing, assign a hearing age, or report clinical thresholds.</p><h2>Comfortable listening</h2><p>Start with a low system volume. Experiments play until you stop them, so you can change things while you listen; Stop and Escape silence everything at once, and so does leaving the page. Challenge clips are short. Do not turn up the volume to chase an inaudible tone. A browser cannot know the actual sound level at your ears.</p></article><aside><div class="about-card"><h3>Small footprint. Open by design.</h3><ul><li>11 interactive experiments</li><li>3 listening challenges</li><li>Audio generated on your device</li><li>Microphone only if you dictate a note</li><li>No recordings</li><li>No accounts or third-party tracking</li><li>Notebook stored in this browser</li><li>Keyboard and touch controls</li><li>No runtime dependencies</li></ul><a class="outline-button" href="https://github.com/silviot/hearing-lab" target="_blank" rel="noopener noreferrer">GitHub repository ↗</a><a class="source-download" href="./hearing-lab-source.tar.gz" download>Download this version’s complete source ↓</a><p class="license-note">Licensed under GNU AGPL version 3. Modified versions offered over a network must offer their corresponding source under the license.</p></div><div class="about-card"><h3>A few things worth reading</h3><a href="https://www.w3.org/TR/webaudio-1.0/" target="_blank" rel="noopener noreferrer">Web Audio specification ↗</a><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11362506/" target="_blank" rel="noopener noreferrer">Psychoacoustics in the browser ↗</a><a href="https://deutsch.ucsd.edu/psychology/pages.php?i=213" target="_blank" rel="noopener noreferrer">Diana Deutsch’s auditory illusions ↗</a><a href="https://www.mathpsy.uni-tuebingen.de/acoulab/calibration.html" target="_blank" rel="noopener noreferrer">Why calibration matters ↗</a></div></aside></div>`;
+  const bullets = tRaw('about.bullets') || [];
+  main().innerHTML = `<section class="simple-header"><div class="eyebrow">${esc(t('about.eyebrow'))}</div><h1>${esc(t('about.title'))}<span class="heading-dot">.</span></h1><p>${esc(t('about.subtitle'))}</p></section><div class="about-grid"><article><h2>${esc(t('about.whatTitle'))}</h2><p>${esc(t('about.whatP1'))}</p><p>${esc(t('about.whatP2'))}</p><h2>${esc(t('about.expTitle'))}</h2><p>${esc(t('about.expP1'))}</p><h2>${esc(t('about.chalTitle'))}</h2><p>${esc(t('about.chalP1'))}</p><h2>${esc(t('about.comfortTitle'))}</h2><p>${esc(t('about.comfortP1'))}</p></article><aside><div class="about-card"><h3>${esc(t('about.footprintTitle'))}</h3><ul>${bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul><a class="outline-button" href="https://github.com/silviot/hearing-lab" target="_blank" rel="noopener noreferrer">${esc(t('about.githubRepo'))} <span dir="ltr">↗</span></a><a class="source-download" href="./hearing-lab-source.tar.gz" download>${esc(t('about.downloadCompleteSource'))} <span dir="ltr">↓</span></a><p class="license-note">${esc(t('about.licenseNote'))}</p></div><div class="about-card"><h3>${esc(t('about.readingTitle'))}</h3><a href="https://www.w3.org/TR/webaudio-1.0/" target="_blank" rel="noopener noreferrer">${esc(t('about.readWebAudio'))} <span dir="ltr">↗</span></a><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11362506/" target="_blank" rel="noopener noreferrer">${esc(t('about.readPsycho'))} <span dir="ltr">↗</span></a><a href="https://deutsch.ucsd.edu/psychology/pages.php?i=213" target="_blank" rel="noopener noreferrer">${esc(t('about.readDeutsch'))} <span dir="ltr">↗</span></a><a href="https://www.mathpsy.uni-tuebingen.de/acoulab/calibration.html" target="_blank" rel="noopener noreferrer">${esc(t('about.readCalib'))} <span dir="ltr">↗</span></a></div></aside></div>`;
 }
 
 function showSetup() {
   engine.stop('setup');
   const dialog = document.querySelector('#setup-dialog');
-  dialog.innerHTML = `<button class="dialog-close icon-button" data-action="close-setup" aria-label="Close setup">${icon('close')}</button><span class="setup-hero-icon">${icon('headphones')}</span><div class="eyebrow">ONE MINUTE TO GET READY</div><h2 id="setup-title">Give your ears a good seat.</h2><p>Use stereo headphones and start with a low system volume. Find a quiet spot, then check the two channels.</p><div class="channel-checks"><button class="outline-button" data-check-ear="left">${icon('play')} Left ear</button><button class="outline-button" data-check-ear="right">${icon('play')} Right ear</button></div><p class="setup-small">Each button plays a short 1,000 Hz tone. If it plays in both ears, check your system’s mono-audio setting. Spatial audio and other effects can change the experiments.</p><label class="setup-checkbox"><input type="checkbox" id="setup-confirm" ${prefs.setup?'checked':''}> The sound is quiet and comfortable.</label><button class="primary-button setup-done" data-action="finish-setup">Ready to explore ${icon('arrow')}</button><p class="setup-small">This sets a listening level, not a medical calibration.</p>`;
+  dialog.innerHTML = `<button class="dialog-close icon-button" data-action="close-setup" aria-label="${esc(t('setup.closeAria'))}">${icon('close')}</button><span class="setup-hero-icon">${icon('headphones')}</span><div class="eyebrow">${esc(t('setup.eyebrow'))}</div><h2 id="setup-title">${esc(t('setup.title'))}</h2><p>${esc(t('setup.body'))}</p><div class="channel-checks"><button class="outline-button" data-check-ear="left">${icon('play')} ${esc(t('setup.leftEar'))}</button><button class="outline-button" data-check-ear="right">${icon('play')} ${esc(t('setup.rightEar'))}</button></div><p class="setup-small">${esc(t('setup.monoNote'))}</p><label class="setup-checkbox"><input type="checkbox" id="setup-confirm" ${prefs.setup ? 'checked' : ''}> ${esc(t('setup.confirmLabel'))}</label><button class="primary-button setup-done" data-action="finish-setup">${esc(t('setup.readyBtn'))} ${icon('arrow')}</button><p class="setup-small">${esc(t('setup.disclaimer'))}</p>`;
   dialog.showModal();
 }
+
 function audioState(state) {
   const isPlaying = Boolean(state.playing), isLive = isPlaying && Boolean(state.live);
-  document.querySelector('#audio-status-dot')?.classList.toggle('playing',isPlaying);
-  const status = document.querySelector('#audio-status'); if(status) status.textContent = isLive ? 'Playing. Change anything.' : isPlaying ? 'Listening…' : 'Ready when you are';
-  const button = document.querySelector('#listen-button'); if(button) { button.innerHTML = isLive ? `${icon('stop')}<span>Stop</span>` : `${icon('play')}<span>Play</span>`; button.classList.toggle('is-playing',isLive); button.setAttribute('aria-pressed',String(isLive)); }
-  const badge = document.querySelector('#live-badge'); if(badge) badge.hidden = !isLive;
-  document.querySelector('#picture-panel')?.classList.toggle('is-live',isLive);
+  document.querySelector('#audio-status-dot')?.classList.toggle('playing', isPlaying);
+  const status = document.querySelector('#audio-status');
+  if (status) status.textContent = isLive ? t('dock.playingLive') : isPlaying ? t('dock.listening') : t('dock.ready');
+  const button = document.querySelector('#listen-button');
+  if (button) {
+    button.innerHTML = isLive ? `${icon('stop')}<span>${esc(t('workbench.stop'))}</span>` : `${icon('play')}<span>${esc(t('workbench.play'))}</span>`;
+    button.classList.toggle('is-playing', isLive);
+    button.setAttribute('aria-pressed', String(isLive));
+  }
+  const badge = document.querySelector('#live-badge');
+  if (badge) badge.hidden = !isLive;
+  document.querySelector('#picture-panel')?.classList.toggle('is-live', isLive);
   cancelAnimationFrame(animation);
-  if(isLive) {
-    if(byId[active]) { visited.add(active); prefs.explored = [...visited]; savePreferences(prefs); document.querySelector(`[data-page="${active}"] .nav-dot`)?.classList.add('visited'); }
+  if (isLive) {
+    if (byId[active]) {
+      visited.add(active);
+      prefs.explored = [...visited];
+      savePreferences(prefs);
+      document.querySelector(`[data-page="${active}"] .nav-dot`)?.classList.add('visited');
+    }
     animation = requestAnimationFrame(followLive);
   } else {
-    document.querySelector('.scope-playhead')?.setAttribute('opacity','0');
-    if(shownPitchClass && !isPlaying) updatePicture();
-    if(['interrupted','devicechange','error'].includes(state.reason)) toast('Playback stopped. Check your output and press Play when ready.');
+    document.querySelector('.scope-playhead')?.setAttribute('opacity', '0');
+    if (shownPitchClass && !isPlaying) updatePicture();
+    if (['interrupted', 'devicechange', 'error'].includes(state.reason)) toast(t('toasts.playbackStopped'));
   }
 }
+
 /** While a looping experiment plays, move the scope playhead and keep the picture on the current step. */
 function followLive() {
-  if(!engine.live) return;
+  if (!engine.live) return;
   const info = engine.liveInfo;
-  if(info && info.cycle >= 0) {
-    const line = document.querySelector('.scope-playhead');
-    if(line && !matchMedia('(prefers-reduced-motion: reduce)').matches) { const x = String(info.cycle*760); line.setAttribute('x1',x); line.setAttribute('x2',x); line.setAttribute('opacity','.5'); }
-    if(active === 'shepard' && info.pitchClass !== shownPitchClass) updatePicture();
+  const line = document.querySelector('.scope-playhead');
+  if (line && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const cycle = info && info.cycle >= 0 ? info.cycle : ((performance.now() / 1400) % 1);
+    const x = String((cycle * 760).toFixed(1));
+    line.setAttribute('x1', x);
+    line.setAttribute('x2', x);
+    line.setAttribute('opacity', '.65');
   }
+  if (info && info.cycle >= 0 && active === 'shepard' && info.pitchClass !== shownPitchClass) updatePicture();
   animation = requestAnimationFrame(followLive);
 }
+
 async function listen() {
-  try { if(engine.live) engine.stop('stopped'); else await engine.startLive(active,settings[active],{seed:12345}); }
-  catch(error) { console.error(error); toast('Audio could not start. Check your output and try Play again.'); }
+  try {
+    if (engine.live) engine.stop('stopped');
+    else await engine.startLive(active, settings[active], { seed: 12345 });
+  } catch (error) {
+    console.error(error);
+    toast(t('toasts.audioStartFailed'));
+  }
 }
+
 let toastTimer;
-function toast(message) { const el=document.querySelector('#toast'); el.textContent=message; el.classList.add('visible'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('visible'),4200); }
-function updateCount() { document.querySelector('#note-count').textContent=readNotes().length; }
+function toast(message) {
+  const el = document.querySelector('#toast');
+  el.textContent = message;
+  el.classList.add('visible');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('visible'), 4200);
+}
+function updateCount() {
+  const countEl = document.querySelector('#note-count');
+  if (countEl) countEl.textContent = readNotes().length;
+}
+
 function loadSharedParams(id, encoded) {
   try {
-    const serialized = new URLSearchParams(encoded).get('s'); if(!serialized || serialized.length>4000) return;
+    const serialized = new URLSearchParams(encoded).get('s');
+    if (!serialized || serialized.length > 4000) return;
     const values = JSON.parse(serialized), original = byId[id].defaults;
-    const allowed = { color:['white','pink','brown'], source:id==='phase'?['sine','complex','noise']:['sine','noise'], mode:['phase','polarity','delay'], routing:id==='beats'?['together','separate']:['stereo','mono'], direction:['up','down'], shape:['sine','triangle','square','sawtooth'], ear:['both','left','right'] };
-    for(const key of Object.keys(original)) {
-      const v=values[key];
-      if(typeof original[key] === 'number' && Number.isFinite(v)) settings[id][key]=v;
-      else if(typeof original[key] === 'boolean' && typeof v==='boolean') settings[id][key]=v;
-      else if(typeof original[key] === 'string' && allowed[key]?.includes(v)) settings[id][key]=v;
-      else if(Array.isArray(original[key]) && Array.isArray(v) && v.length===6 && v.every(x=>Number.isFinite(x)&&x>=0&&x<=1)) settings[id][key]=v;
+    const allowed = { color: ['white', 'pink', 'brown'], source: id === 'phase' ? ['sine', 'complex', 'noise'] : ['sine', 'noise'], mode: ['phase', 'polarity', 'delay'], routing: id === 'beats' ? ['together', 'separate'] : ['stereo', 'mono'], direction: ['up', 'down'], shape: ['sine', 'triangle', 'square', 'sawtooth'], ear: ['both', 'left', 'right'] };
+    for (const key of Object.keys(original)) {
+      const v = values[key];
+      if (typeof original[key] === 'number' && Number.isFinite(v)) settings[id][key] = v;
+      else if (typeof original[key] === 'boolean' && typeof v === 'boolean') settings[id][key] = v;
+      else if (typeof original[key] === 'string' && allowed[key]?.includes(v)) settings[id][key] = v;
+      else if (Array.isArray(original[key]) && Array.isArray(v) && v.length === 6 && v.every(x => Number.isFinite(x) && x >= 0 && x <= 1)) settings[id][key] = v;
     }
     // Shared links are untrusted. Renderers clamp all signal parameters; constrain the UI too.
-    const p=settings[id];
-    const frequencyBounds={phase:[125,2000],beats:[100,800],amplitude:[100,1000],spatial:[125,1500],masking:[500,500],pitch:[100,4000],frequency:[80,Math.min(18000,.45*(engine.sampleRate||48000))]};
-    if('frequency' in p) { const [min,max]=frequencyBounds[id]||[80,4000]; p.frequency=Math.min(max,Math.max(min,p.frequency)); }
-    if('fundamental' in p) p.fundamental=Math.min(500,Math.max(100,p.fundamental));
-    if('duration' in p) p.duration=original.duration;
-    if('steps' in p) p.steps=12;
-    if('phase' in p) p.phase=((p.phase%360)+360)%360;
-    if('pan' in p) p.pan=Math.min(1,Math.max(-1,p.pan));
-    if('delayMs' in p) p.delayMs=Math.min(id==='spatial'?1:2,Math.max(id==='spatial'?-1:0,p.delayMs));
-    if('difference' in p) p.difference=Math.min(20,Math.max(.5,p.difference));
-    if('snr' in p) p.snr=Math.min(0,Math.max(-30,p.snr));
-    if('gainDb' in p) p.gainDb=Math.min(0,Math.max(-30,p.gainDb));
-    if('gapMs' in p) p.gapMs=Math.min(64,Math.max(1,p.gapMs));
-    if(id==='phase' && p.source!=='sine' && p.mode==='phase') p.mode='polarity';
-    if(id==='phase' && p.mode==='polarity') p.phase=p.phase>=90&&p.phase<270?180:0;
+    const p = settings[id];
+    const frequencyBounds = { phase: [125, 2000], beats: [100, 800], amplitude: [100, 1000], spatial: [125, 1500], masking: [500, 500], pitch: [100, 4000], frequency: [80, Math.min(18000, .45 * (engine.sampleRate || 48000))] };
+    if ('frequency' in p) { const [min, max] = frequencyBounds[id] || [80, 4000]; p.frequency = Math.min(max, Math.max(min, p.frequency)); }
+    if ('fundamental' in p) p.fundamental = Math.min(500, Math.max(100, p.fundamental));
+    if ('duration' in p) p.duration = original.duration;
+    if ('steps' in p) p.steps = 12;
+    if ('phase' in p) p.phase = ((p.phase % 360) + 360) % 360;
+    if ('pan' in p) p.pan = Math.min(1, Math.max(-1, p.pan));
+    if ('delayMs' in p) p.delayMs = Math.min(id === 'spatial' ? 1 : 2, Math.max(id === 'spatial' ? -1 : 0, p.delayMs));
+    if ('difference' in p) p.difference = Math.min(20, Math.max(.5, p.difference));
+    if ('snr' in p) p.snr = Math.min(0, Math.max(-30, p.snr));
+    if ('gainDb' in p) p.gainDb = Math.min(0, Math.max(-30, p.gainDb));
+    if ('gapMs' in p) p.gapMs = Math.min(64, Math.max(1, p.gapMs));
+    if (id === 'phase' && p.source !== 'sine' && p.mode === 'phase') p.mode = 'polarity';
+    if (id === 'phase' && p.mode === 'polarity') p.phase = p.phase >= 90 && p.phase < 270 ? 180 : 0;
   } catch { /* Invalid links simply use the experiment defaults. */ }
 }
 
-app.addEventListener('click', async event => {
-  const target=event.target.closest('button,a'); if(!target) return;
-  if(target.dataset.category) { category=target.dataset.category; document.querySelectorAll('[data-category]').forEach(b=>{b.classList.toggle('selected',b.dataset.category===category);b.setAttribute('aria-pressed',String(b.dataset.category===category));}); renderCards(); return; }
-  if(target.dataset.mode) { engine.stop('mode changed'); currentMode=target.dataset.mode; document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('selected',b===target));renderWorkbench();return; }
-  if(target.dataset.paramButton) { const key=target.dataset.paramButton; let v=target.dataset.value; if(typeof settings[active][key]==='number')v=Number(v);else if(typeof settings[active][key]==='boolean')v=v==='true'; changeParameter(key,v,true); return; }
-  if(target.dataset.frequency) { changeParameter('frequency',Number(target.dataset.frequency),true);return; }
-  if(target.dataset.preset) {
-    const p=settings[active], preset=target.dataset.preset;
-    if(active==='phase') Object.assign(p,{source:'sine',mode:'phase',phase:preset==='same'?0:180,routing:preset==='cancel'?'mono':'stereo'});
-    if(active==='harmonics') p.harmonics=preset==='full'?[1,.65,.45,.3,.22,.16]:preset==='missing'?[0,.65,.45,.3,.22,.16]:[1,0,0,0,0,0];
-    renderControls();settingsChanged();return;
+function toggleHarmonic(idx) {
+  const current = settings.harmonics.harmonics[idx];
+  const def = byId.harmonics.defaults.harmonics[idx] || 0.5;
+  settings.harmonics.harmonics[idx] = current > 0.01 ? 0 : def;
+  renderControls();
+  settingsChanged();
+}
+
+// Direct manipulation on explanatory SVG diagrams.
+let activeDrag = null;
+function applyPictureDrag(event) {
+  if (!activeDrag) return;
+  const svg = document.querySelector('#picture .picture-svg');
+  if (!svg) return;
+  const rect = svg.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const vx = (event.clientX - rect.left) / rect.width * 760;
+  const vy = (event.clientY - rect.top) / rect.height * 250;
+  const { key, axis, min, max, c0, c1, log } = activeDrag;
+  const coord = axis === 'y' ? vy : vx;
+  const u = Math.min(1, Math.max(0, (coord - c0) / (c1 - c0)));
+  let val = log ? min * (max / min) ** u : min + u * (max - min);
+  if (['frequency', 'fundamental', 'phase', 'snr', 'gainDb', 'gapMs'].includes(key)) val = Math.round(val);
+  else if (key === 'difference') val = Math.round(val * 2) / 2;
+  else if (['delayMs', 'pan'].includes(key)) val = Math.round(val * 40) / 40;
+  const maxFreq = Math.min(18000, .45 * (engine.sampleRate || 48000));
+  if (active === 'frequency' && key === 'frequency') val = Math.min(maxFreq, val);
+  changeParameter(key, val, false);
+}
+app.addEventListener('pointerdown', event => {
+  const dragEl = event.target.closest?.('[data-drag-param]');
+  if (!dragEl) return;
+  event.preventDefault();
+  const axis = dragEl.dataset.dragAxis === 'y' ? 'y' : 'x';
+  activeDrag = {
+    key: dragEl.dataset.dragParam,
+    axis,
+    min: Number(dragEl.dataset.dragMin),
+    max: Number(dragEl.dataset.dragMax),
+    c0: Number(axis === 'y' ? dragEl.dataset.dragY0 : dragEl.dataset.dragX0),
+    c1: Number(axis === 'y' ? dragEl.dataset.dragY1 : dragEl.dataset.dragX1),
+    log: dragEl.dataset.dragLog === 'true',
+  };
+  applyPictureDrag(event);
+});
+window.addEventListener('pointermove', event => { if (activeDrag) applyPictureDrag(event); });
+window.addEventListener('pointerup', () => { activeDrag = null; });
+window.addEventListener('pointercancel', () => { activeDrag = null; });
+
+app.addEventListener('change', async event => {
+  if (event.target.id === 'language-select') {
+    const newLang = event.target.value;
+    const savedObs = document.querySelector('#observation')?.value || '';
+    const scrollY = window.scrollY;
+    prefs.lang = newLang;
+    savePreferences(prefs);
+    await loadLanguage(newLang);
+    applyLanguageToDocument();
+    shell();
+    document.querySelector('#setup-dialog').addEventListener('cancel', () => engine.stop('setup closed'));
+    renderRoute({ preserveMode: true, preserveScroll: true });
+    const obsField = document.querySelector('#observation');
+    if (obsField && savedObs) obsField.value = savedObs;
+    window.scrollTo({ top: scrollY, behavior: 'instant' });
   }
-  if(target.dataset.checkEar) { try{await engine.play('frequency',{frequency:1000,ear:target.dataset.checkEar,duration:.6});}catch{toast('Audio could not start. Try again.');}return; }
-  if(target.dataset.deleteNote) { try{removeNote(target.dataset.deleteNote);updateCount();renderNotebook();toast('Note deleted.');}catch{toast('This note could not be deleted.');}return; }
-  switch(target.dataset.action) {
+});
+
+app.addEventListener('click', async event => {
+  const clickHarmonic = event.target.closest?.('[data-click-harmonic]');
+  if (clickHarmonic && active === 'harmonics') { toggleHarmonic(Number(clickHarmonic.dataset.clickHarmonic)); return; }
+  const clickParam = event.target.closest?.('[data-click-param]');
+  if (clickParam && byId[active]) {
+    const key = clickParam.dataset.clickParam;
+    let v = clickParam.dataset.clickValue;
+    if (typeof settings[active][key] === 'number') v = Number(v);
+    else if (typeof settings[active][key] === 'boolean') v = v === 'true';
+    changeParameter(key, v, true);
+    return;
+  }
+  const target = event.target.closest('button,a');
+  if (!target) return;
+  if (target.dataset.toggleHarmonic !== undefined && active === 'harmonics') { toggleHarmonic(Number(target.dataset.toggleHarmonic)); return; }
+  if (target.dataset.category) {
+    category = target.dataset.category;
+    document.querySelectorAll('[data-category]').forEach(b => {
+      b.classList.toggle('selected', b.dataset.category === category);
+      b.setAttribute('aria-pressed', String(b.dataset.category === category));
+    });
+    renderCards();
+    return;
+  }
+  if (target.dataset.mode) {
+    engine.stop('mode changed');
+    currentMode = target.dataset.mode;
+    document.querySelectorAll('[data-mode]').forEach(b => {
+      b.classList.toggle('selected', b === target);
+      b.setAttribute('aria-pressed', String(b === target));
+    });
+    renderWorkbench();
+    return;
+  }
+  if (target.dataset.paramButton) {
+    const key = target.dataset.paramButton;
+    let v = target.dataset.value;
+    if (typeof settings[active][key] === 'number') v = Number(v);
+    else if (typeof settings[active][key] === 'boolean') v = v === 'true';
+    changeParameter(key, v, true);
+    return;
+  }
+  if (target.dataset.frequency) { changeParameter('frequency', Number(target.dataset.frequency), true); return; }
+  if (target.dataset.preset) {
+    const p = settings[active], preset = target.dataset.preset;
+    if (active === 'phase') Object.assign(p, { source: 'sine', mode: 'phase', phase: preset === 'same' ? 0 : 180, routing: preset === 'cancel' ? 'mono' : 'stereo' });
+    if (active === 'harmonics') p.harmonics = preset === 'full' ? [1, .65, .45, .3, .22, .16] : preset === 'missing' ? [0, .65, .45, .3, .22, .16] : [1, 0, 0, 0, 0, 0];
+    renderControls();
+    settingsChanged();
+    return;
+  }
+  if (target.dataset.checkEar) {
+    try { await engine.play('frequency', { frequency: 1000, ear: target.dataset.checkEar, duration: .6 }); }
+    catch { toast(t('toasts.audioTryAgain')); }
+    return;
+  }
+  if (target.dataset.deleteNote) {
+    try { removeNote(target.dataset.deleteNote); updateCount(); renderNotebook(); toast(t('toasts.noteDeleted')); }
+    catch { toast(t('toasts.deleteFailed')); }
+    return;
+  }
+  switch (target.dataset.action) {
     case 'menu': document.querySelector('.sidebar').classList.toggle('open'); syncNavigation(); break;
-    case 'stop': engine.stop('stopped');break;
-    case 'setup':showSetup();break;
-    case 'close-setup':engine.stop('setup closed');document.querySelector('#setup-dialog').close();break;
-    case 'finish-setup':if(!document.querySelector('#setup-confirm').checked){toast('Check that the level feels quiet and comfortable first.');return;}prefs.setup=true;savePreferences(prefs);document.querySelector('.setup-dot').classList.add('done');engine.stop('setup complete');document.querySelector('#setup-dialog').close();toast('Ready. Keep this comfortable volume as you explore.');break;
-    case 'listen':await listen();break;
-    case 'reset':settings[active]=structuredClone(byId[active].defaults);if(currentMode==='explore'){renderControls();settingsChanged();}else renderWorkbench();toast('Experiment reset.');break;
-    case 'share':try{const url=new URL(location.href);url.hash=`${active}?${new URLSearchParams({s:JSON.stringify(settings[active])})}`;await navigator.clipboard.writeText(url.href);toast('Experiment link copied. Your notes stay private.');}catch{toast('Clipboard unavailable. You can share this page’s address.');}break;
-    case 'export':downloadNotes();toast('Notebook exported as JSON.');break;
+    case 'stop': engine.stop('stopped'); break;
+    case 'setup': showSetup(); break;
+    case 'close-setup': engine.stop('setup closed'); document.querySelector('#setup-dialog').close(); break;
+    case 'finish-setup':
+      if (!document.querySelector('#setup-confirm').checked) { toast(t('toasts.confirmSetupFirst')); return; }
+      prefs.setup = true; savePreferences(prefs);
+      document.querySelector('.setup-dot')?.classList.add('done');
+      engine.stop('setup complete');
+      document.querySelector('#setup-dialog').close();
+      toast(t('toasts.setupComplete'));
+      break;
+    case 'listen': await listen(); break;
+    case 'toggle-spectrum':
+      forceSpectrum = !forceSpectrum;
+      target.classList.toggle('active', forceSpectrum);
+      target.setAttribute('aria-pressed', String(forceSpectrum));
+      updateVisual();
+      break;
+    case 'clear-filter': category = 'all'; query = ''; renderHome(); break;
+    case 'reset':
+      settings[active] = structuredClone(byId[active].defaults);
+      if (currentMode === 'explore') { renderControls(); settingsChanged(); }
+      else renderWorkbench();
+      toast(t('toasts.experimentReset'));
+      break;
+    case 'share':
+      try {
+        const url = new URL(location.href);
+        url.hash = `${active}?${new URLSearchParams({ s: JSON.stringify(settings[active]) })}`;
+        await navigator.clipboard.writeText(url.href);
+        toast(t('toasts.linkCopied'));
+      } catch { toast(t('toasts.clipboardUnavailable')); }
+      break;
+    case 'export': downloadNotes(); toast(t('toasts.exportedJson')); break;
     case 'dictate': if (dictation.listening) dictation.stop(); else dictation.start(document.querySelector('#observation').value); break;
-    case 'save-note':{
+    case 'save-note': {
       dictation.cancel();
-      const text=document.querySelector('#observation').value.trim();if(!text){document.querySelector('#observation').focus();toast('Write an observation or question first.');return;}
-      try{saveNote({experiment:active,title:byId[active].title,type:'observation',observation:text,params:structuredClone(settings[active]),setup:setupSnapshot()});updateCount();document.querySelector('#observation').value='';toast('Saved to your notebook.');}catch{toast('This browser could not save the note. Check available storage.');}break;
+      const text = document.querySelector('#observation').value.trim();
+      if (!text) { document.querySelector('#observation').focus(); toast(t('toasts.writeObservationFirst')); return; }
+      try {
+        const e = localizedExperiment(byId[active]);
+        saveNote({ experiment: active, title: e.title, type: 'observation', observation: text, params: structuredClone(settings[active]), setup: setupSnapshot() });
+        updateCount();
+        document.querySelector('#observation').value = '';
+        toast(t('toasts.noteSaved'));
+      } catch { toast(t('toasts.saveFailed')); }
+      break;
     }
   }
 });
-app.addEventListener('input',event=>{
-  const el=event.target;
-  if(el.id==='master-volume'){engine.setVolume(Number(el.value)/100);prefs.volume=Number(el.value)/100;savePreferences(prefs);document.querySelector('#volume-value').textContent=`${el.value}%`;return;}
-  if(el.id==='experiment-search'){query=el.value;renderCards();return;}
-  if(el.dataset.param){const key=el.dataset.param;const value=el.dataset.log?Math.round(2**Number(el.value)):Number(el.value);changeParameter(key,value);document.querySelector(`#output-${key}`).textContent=formatValue(key,value);el.setAttribute('aria-valuetext',formatValue(key,value));if(active==='harmonics'&&key==='fundamental')document.querySelectorAll('.harmonic-control').forEach((c,i)=>{c.querySelector('span').textContent=`${Math.round((i+1)*value)} Hz`;c.querySelector('input').setAttribute('aria-label',`Harmonic ${i+1}, ${Math.round((i+1)*value)} hertz`);});return;}
-  if(el.dataset.harmonic!==undefined){settings.harmonics.harmonics[Number(el.dataset.harmonic)]=Number(el.value);el.parentElement.querySelector('output').textContent=`${Math.round(el.value*100)}%`;settingsChanged();}
+
+// Double-click any range slider or harmonic fader to reset that individual parameter.
+app.addEventListener('dblclick', event => {
+  const el = event.target;
+  if (el.dataset?.param && byId[active]) {
+    const key = el.dataset.param;
+    changeParameter(key, byId[active].defaults[key], true);
+  } else if (el.dataset?.harmonic !== undefined && active === 'harmonics') {
+    toggleHarmonic(Number(el.dataset.harmonic));
+  }
 });
-document.addEventListener('keydown',event=>{if(event.key==='Escape'){engine.stop('stopped');document.querySelector('.sidebar')?.classList.remove('open');syncNavigation();}});
-document.querySelector('.skip-link').addEventListener('click',event=>{event.preventDefault();main().focus();});
-window.addEventListener('resize',syncNavigation);
-window.addEventListener('hashchange',renderRoute);
-shell();
-document.querySelector('#setup-dialog').addEventListener('cancel',()=>engine.stop('setup closed'));
-renderRoute();
+
+app.addEventListener('input', event => {
+  const el = event.target;
+  if (el.id === 'master-volume') {
+    engine.setVolume(Number(el.value) / 100);
+    prefs.volume = Number(el.value) / 100;
+    savePreferences(prefs);
+    el.style.setProperty('--progress', `${el.value}%`);
+    document.querySelector('#volume-value').textContent = `${el.value}%`;
+    return;
+  }
+  if (el.id === 'experiment-search') { query = el.value; renderCards(); return; }
+  if (el.dataset.param) {
+    const key = el.dataset.param;
+    const value = el.dataset.log ? Math.round(2 ** Number(el.value)) : Number(el.value);
+    changeParameter(key, value);
+    if (active === 'harmonics' && key === 'fundamental') {
+      document.querySelectorAll('.harmonic-control').forEach((c, i) => {
+        const hz = Math.round((i + 1) * value);
+        c.querySelector('span').textContent = `${hz} Hz`;
+        c.querySelector('input').setAttribute('aria-label', t('controls.harmonicAria', { n: i + 1, hz }));
+      });
+    }
+    return;
+  }
+  if (el.dataset.harmonic !== undefined) {
+    const idx = Number(el.dataset.harmonic), val = Number(el.value), pct = Math.round(val * 100);
+    settings.harmonics.harmonics[idx] = val;
+    const ctrl = el.closest('.harmonic-control');
+    if (ctrl) { ctrl.style.setProperty('--h-level', `${pct}%`); ctrl.querySelector('output').textContent = `${pct}%`; }
+    settingsChanged();
+  }
+});
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    engine.stop('stopped');
+    document.querySelector('.sidebar')?.classList.remove('open');
+    syncNavigation();
+    return;
+  }
+  if (event.key === ' ' && byId[active] && currentMode === 'explore' && !document.querySelector('#setup-dialog[open]') && !event.target.closest?.('button,a,input,textarea,select,summary,[contenteditable]')) {
+    event.preventDefault();
+    listen();
+  }
+});
+document.querySelector('.skip-link')?.addEventListener('click', event => { event.preventDefault(); main()?.focus(); });
+window.addEventListener('resize', syncNavigation);
+window.addEventListener('hashchange', () => renderRoute());
+
+(async () => {
+  const hashQuery = location.hash.includes('?') ? location.hash.split('?')[1] : '';
+  const urlLang = new URLSearchParams(location.search).get('lang') || new URLSearchParams(hashQuery).get('lang');
+  const initialLang = detectLanguage({ urlLang, saved: prefs.lang });
+  await loadLanguage(initialLang);
+  applyLanguageToDocument();
+  shell();
+  document.querySelector('#setup-dialog').addEventListener('cancel', () => engine.stop('setup closed'));
+  renderRoute();
+})();
