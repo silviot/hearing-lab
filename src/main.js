@@ -56,6 +56,15 @@ function applyLanguageToDocument() {
   const meta = getLanguageMeta(code);
   document.documentElement.lang = code;
   document.documentElement.dir = isRtl(code) ? 'rtl' : 'ltr';
+  if (prefs.lang) {
+    document.documentElement.setAttribute('translate', 'no');
+    if (!document.querySelector('meta[name="google"]')) {
+      const m = document.createElement('meta');
+      m.name = 'google';
+      m.content = 'notranslate';
+      document.head.appendChild(m);
+    }
+  }
   dictation.lang = meta.speech;
   const descMeta = document.querySelector('meta[name="description"]');
   if (descMeta) descMeta.setAttribute('content', t('meta.description'));

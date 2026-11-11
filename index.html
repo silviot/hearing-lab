@@ -1,11 +1,40 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" translate="no">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="google" content="notranslate">
   <meta name="theme-color" content="#182523">
   <meta name="description" content="An open audio playground for curious ears. Explore phase, pitch, sound, and perception through eleven hands-on experiments.">
   <title>Hearing Lab — an open playground for curious ears</title>
+  <script>
+    (() => {
+      const supported = new Set(['en','es','ar','fr','pt','id','hi','ur','ru','de','zh','bg','hu','ro','it','hr']);
+      const aliases = { cmn: 'zh', yue: 'zh', in: 'id', sh: 'hr', hbs: 'hr' };
+      const match = tag => {
+        if (!tag || typeof tag !== 'string') return null;
+        const c = tag.trim().toLowerCase().replace(/_/g, '-');
+        if (supported.has(c)) return c;
+        const p = c.split('-')[0];
+        return supported.has(p) ? p : (aliases[p] || null);
+      };
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem('hearing-lab:preferences:v1') || '{}').lang; } catch {}
+      const hashQ = location.hash.includes('?') ? location.hash.split('?')[1] : '';
+      const urlLang = new URLSearchParams(location.search).get('lang') || new URLSearchParams(hashQ).get('lang');
+      const candidates = [urlLang, saved, ...(navigator.languages?.length ? navigator.languages : [navigator.language])];
+      let matched = null;
+      for (const item of candidates) { matched = match(item); if (matched) break; }
+      const code = matched || 'en';
+      const root = document.documentElement;
+      root.lang = code;
+      root.dir = (code === 'ar' || code === 'ur') ? 'rtl' : 'ltr';
+      if (!matched) {
+        root.removeAttribute('translate');
+        document.querySelector('meta[name="google"]')?.remove();
+      }
+    })();
+  </script>
   <link rel="icon" type="image/svg+xml" href="./public/icon.svg">
   <link rel="stylesheet" href="./src/style.css">
 </head>
