@@ -28,6 +28,14 @@ The server rejects paths outside its selected root, including escaping symlinks,
 
 In source mode, the exact `/hearing-lab-source.tar.gz` path serves the archive from `dist/`. Run the build to create or refresh it before checking the download link.
 
+## Production deploy (`pgs.sh`)
+
+```sh
+npm run deploy
+```
+
+Builds `dist/` (including `hearing-lab-source.tar.gz`) and syncs it via `rsync` to `pgs.sh:hearing-lab` ([https://silvio-hearing-lab.pgs.sh/](https://silvio-hearing-lab.pgs.sh/)).
+
 ## GitHub Pages
 
 The repository includes two workflows:

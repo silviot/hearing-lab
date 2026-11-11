@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "node scripts/serve.mjs",
     "build": "node scripts/build.mjs",
+    "deploy": "npm run build && rsync -rv --exclude=.nojekyll --delete dist/ pgs.sh:hearing-lab",
     "test": "node --test",
     "check": "node scripts/check.mjs"
   },
