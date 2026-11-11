@@ -13,7 +13,7 @@ const r2 = value => Number(value.toFixed(2));
 const hzText = f => f >= 1000 ? `${r2(f / 1000)} kHz` : `${Math.round(f)} Hz`;
 const xmlEsc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 const text = (x, y, content, { size = 12, fill = DIM, anchor = 'start', weight = 400, spacing = 0 } = {}) =>
-  `<text x="${x}" y="${y}" font-size="${size}" fill="${fill}" text-anchor="${anchor}" font-weight="${weight}"${spacing ? ` letter-spacing="${spacing}"` : ''}>${xmlEsc(content)}</text>`;
+  `<text x="${x}" y="${y}" direction="ltr" unicode-bidi="isolate" font-size="${size}" fill="${fill}" text-anchor="${anchor}" font-weight="${weight}"${spacing ? ` letter-spacing="${spacing}"` : ''}>${xmlEsc(content)}</text>`;
 const label = (x, y, content, fill = DIM, anchor = 'start') => {
   const rtlOrIndic = ['ar', 'ur', 'hi', 'zh'].includes(getLanguage());
   return text(x, y, content, { size: 10.5, fill, anchor, weight: 600, spacing: rtlOrIndic ? 0 : 1.1 });
@@ -215,7 +215,7 @@ function amplitudePicture(p) {
       ${stroke(curve(u => shape.fn(TAU * 2 * u), x0, x1, yc, full * gain, 400), LEFT, 2.7)}
     </g>
     ${label(x0, 24, t('pictures.amplitude.thisWave', { pct: Math.round(gain * 100) }), LEFT)}
-    ${label(560, 24, t('pictures.amplitude.ingredients'), WARM)}${text(560, 240, t('pictures.amplitude.harmonicAxis'), { size: 10.5 })}${bars}`;
+    ${label(560, 24, t('pictures.amplitude.ingredients'), WARM)}${text(638, 240, t('pictures.amplitude.harmonicAxis'), { size: 10.5, anchor: 'middle' })}${bars}`;
   const caption = `${db === 0 ? t('pictures.amplitude.cap0db') : t('pictures.amplitude.capDb', { db: -db, pct: Math.round(gain * 100) })}${t('pictures.amplitude.capLoudness')}${t(`pictures.amplitude.${shape.noteKey}`)}`;
   return { svg, caption, title: t('pictures.amplitude.title'), hint: t('pictures.amplitude.hint') };
 }

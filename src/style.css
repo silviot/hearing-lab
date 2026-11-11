@@ -3724,7 +3724,7 @@ dialog>p {
   border:1px solid #35564b;
   border-radius:99px;
   padding:2px 10px;
-  white-space:nowrap
+  max-width:100%
 }
 
 .picture-hint:empty {
@@ -3741,7 +3741,7 @@ dialog>p {
 
 .picture-svg {
   width:100%;
-  min-width:560px;
+  min-width:0;
   height:auto;
   user-select:none;
   -webkit-user-select:none
@@ -4054,7 +4054,10 @@ input[type=range]:hover::-webkit-slider-thumb {
   margin-top:6px
 }
 
-@media(max-width:640px) {
+@media(max-width:520px) {
+  .picture-svg {
+    min-width:460px
+  }
   .picture-swipe {
     display:block
   }
@@ -4072,7 +4075,7 @@ input[type=range]:hover::-webkit-slider-thumb {
   }
 }
 
-  @media(prefers-reduced-motion:reduce) {
+@media(prefers-reduced-motion:reduce) {
   *,*:before,*:after {
     animation:none!important;
     transition:none!important;
@@ -4084,8 +4087,53 @@ input[type=range]:hover::-webkit-slider-thumb {
 }
 
 /* Language switcher & multilingual / RTL layout */
+.picture-svg,.signal-scope,.spectrum-view,.hero-scope,.challenge-chart {
+  direction:ltr
+}
+
+.breadcrumb {
+  min-width:0;
+  flex:1;
+  overflow:hidden
+}
+
+.breadcrumb strong {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap
+}
+
 .topbar-actions {
-  gap:12px
+  gap:12px;
+  flex-shrink:0
+}
+
+.setup-chip {
+  white-space:nowrap;
+  flex-shrink:0
+}
+
+.workbench-top {
+  flex-wrap:wrap;
+  row-gap:8px
+}
+
+.workbench-tools {
+  margin-inline-start:auto;
+  flex-wrap:wrap
+}
+
+.scope-top {
+  flex-wrap:wrap;
+  gap:8px
+}
+
+.scope-legend {
+  flex-wrap:wrap
+}
+
+.scope-actions {
+  margin-inline-start:auto
 }
 
 .lang-picker {
@@ -4205,6 +4253,19 @@ input[type=range]:hover::-webkit-slider-thumb {
   transform:rotate(90deg)
 }
 
+[dir="rtl"] input[type=range]:not([data-harmonic])::-webkit-slider-runnable-track {
+  background:linear-gradient(to left,#5c7f50 0%,#5c7f50 var(--progress,50%),#d8e0ce var(--progress,50%),#d8e0ce 100%)
+}
+
+@media(max-width:520px) {
+  .setup-chip-label {
+    display:none
+  }
+  .setup-chip .setup-dot {
+    margin-inline-start:0
+  }
+}
+
 @media(max-width:720px) {
   .lang-picker {
     padding:4px 8px;
@@ -4240,6 +4301,9 @@ input[type=range]:hover::-webkit-slider-thumb {
 }
 
 @media(max-width:480px) {
+  .feature-copy p {
+    max-width:100%
+  }
   .lang-picker {
     padding:3px 6px
   }
